@@ -7,61 +7,146 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gorilla/mux"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const apiKey = "26AMBY8WA3V0FCMD"
 
 // gets all the symbols from the alphavantage api ,sends back only the symbols that are active
 func getAllStockSymbols(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	ctx, span := startSpan(r.Context(), "getAllStockSymbols")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("api.name", "alphavantage"),
+		attribute.String("request.type", "stock_symbols"),
+	)
+
+	// Child span for API call
+	_, apiSpan := startChildSpan(ctx, "alphavantage.listing_status")
+	defer apiSpan.End()
+
 	apiUrl := fmt.Sprintf("https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=%s", apiKey)
-	fmt.Println("API URL request sent")
+	apiSpan.AddEvent("making API request", trace.WithAttributes(
+		attribute.String("url", apiUrl),
+	))
+
 	response, err := http.Get(apiUrl)
-	fmt.Println("API response", response)
 	if err != nil {
+		apiSpan.SetStatus(codes.Error, "failed to fetch stock symbols")
+		apiSpan.RecordError(err)
+		recordError(ctx, "getAllStockSymbols", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		recordApiRequest(ctx, "/stocks/symbols", time.Since(start), http.StatusInternalServerError)
 		return
 	}
 	defer response.Body.Close()
+
+	// Child span for CSV processing
+	_, csvSpan := startChildSpan(ctx, "process_csv_response")
+	defer csvSpan.End()
+
 	reader := csv.NewReader(response.Body)
-	reader.Read()
+	reader.Read() // Skip header
 	var symbols []string
+
 	for {
 		record, err := reader.Read()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
+			csvSpan.RecordError(err)
+			recordError(ctx, "getAllStockSymbols_csvRead", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			recordApiRequest(ctx, "/stocks/symbols", time.Since(start), http.StatusInternalServerError)
+			return
 		}
 		if strings.TrimSpace(record[6]) == "Active" {
 			symbols = append(symbols, record[0])
 		}
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(symbols)
 
+	csvSpan.SetAttributes(attribute.Int("symbols.count", len(symbols)))
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(symbols); err != nil {
+		span.RecordError(err)
+		recordError(ctx, "getAllStockSymbols_jsonEncode", err)
+		recordApiRequest(ctx, "/stocks/symbols", time.Since(start), http.StatusInternalServerError)
+		return
+	}
+
+	duration := time.Since(start)
+	recordApiRequest(ctx, "/stocks/symbols", duration, http.StatusOK)
+
+	span.AddEvent("request completed", trace.WithAttributes(
+		attribute.Int("response.symbols", len(symbols)),
+		attribute.Int64("response.time_ms", duration.Milliseconds()),
+	))
 }
 
 func getStockData(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	ctx, span := startSpan(r.Context(), "getStockData")
+	defer span.End()
+
 	symbol := mux.Vars(r)["symbol"]
+	span.SetAttributes(
+		attribute.String("stock.symbol", symbol),
+		attribute.String("api.name", "alphavantage"),
+	)
+
+	// Child span for API call
+	_, apiSpan := startChildSpan(ctx, "alphavantage.time_series")
+	defer apiSpan.End()
+
 	apiUrl := fmt.Sprintf("https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=%s&outputsize=compact&apikey=%s", symbol, apiKey)
-	fmt.Println("API URL request sent", symbol, apiKey)
+	apiSpan.AddEvent("making API request", trace.WithAttributes(
+		attribute.String("url", apiUrl),
+	))
+
 	response, err := http.Get(apiUrl)
 	if err != nil {
+		apiSpan.SetStatus(codes.Error, "failed to fetch stock data")
+		apiSpan.RecordError(err)
+		recordError(ctx, "getStockData", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		recordApiRequest(ctx, "/stocks/data", time.Since(start), http.StatusInternalServerError)
 		return
 	}
 	defer response.Body.Close()
-	//send the data of stock as json
+
 	var stockData map[string]interface{}
-	err = json.NewDecoder(response.Body).Decode(&stockData)
-	if err != nil {
+	if err := json.NewDecoder(response.Body).Decode(&stockData); err != nil {
+		apiSpan.RecordError(err)
+		recordError(ctx, "getStockData_jsonDecode", err)
 		http.Error(w, "Failed to decode JSON", http.StatusInternalServerError)
+		recordApiRequest(ctx, "/stocks/data", time.Since(start), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(stockData)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(stockData); err != nil {
+		span.RecordError(err)
+		recordError(ctx, "getStockData_jsonEncode", err)
+		recordApiRequest(ctx, "/stocks/data", time.Since(start), http.StatusInternalServerError)
+		return
+	}
+
+	duration := time.Since(start)
+	recordApiRequest(ctx, "/stocks/data", duration, http.StatusOK)
+
+	span.AddEvent("request completed", trace.WithAttributes(
+		attribute.String("symbol", symbol),
+		attribute.Int64("response.time_ms", duration.Milliseconds()),
+	))
 }
 
 type coinData struct {
@@ -70,18 +155,41 @@ type coinData struct {
 }
 
 func getAllCryptoSymbols(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	ctx, span := startSpan(r.Context(), "getAllCryptoSymbols")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("api.name", "coingecko"),
+		attribute.String("request.type", "crypto_symbols"),
+	)
+
+	// Child span for API call
+	_, apiSpan := startChildSpan(ctx, "coingecko.markets")
+	defer apiSpan.End()
+
 	apiUrl := "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h"
+	apiSpan.AddEvent("making API request", trace.WithAttributes(
+		attribute.String("url", apiUrl),
+	))
+
 	response, err := http.Get(apiUrl)
 	if err != nil {
+		apiSpan.SetStatus(codes.Error, "failed to fetch crypto symbols")
+		apiSpan.RecordError(err)
+		recordError(ctx, "getAllCryptoSymbols", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		recordApiRequest(ctx, "/crypto/symbols", time.Since(start), http.StatusInternalServerError)
 		return
 	}
 	defer response.Body.Close()
 
 	var cryptoData []map[string]interface{}
-	err = json.NewDecoder(response.Body).Decode(&cryptoData)
-	if err != nil {
+	if err := json.NewDecoder(response.Body).Decode(&cryptoData); err != nil {
+		apiSpan.RecordError(err)
+		recordError(ctx, "getAllCryptoSymbols_jsonDecode", err)
 		http.Error(w, "Failed to decode JSON", http.StatusInternalServerError)
+		recordApiRequest(ctx, "/crypto/symbols", time.Since(start), http.StatusInternalServerError)
 		return
 	}
 
@@ -91,29 +199,90 @@ func getAllCryptoSymbols(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(symbols)
+	if err := json.NewEncoder(w).Encode(symbols); err != nil {
+		span.RecordError(err)
+		recordError(ctx, "getAllCryptoSymbols_jsonEncode", err)
+		recordApiRequest(ctx, "/crypto/symbols", time.Since(start), http.StatusInternalServerError)
+		return
+	}
+
+	duration := time.Since(start)
+	recordApiRequest(ctx, "/crypto/symbols", duration, http.StatusOK)
+
+	span.AddEvent("request completed", trace.WithAttributes(
+		attribute.Int("response.symbols", len(symbols)),
+		attribute.Int64("response.time_ms", duration.Milliseconds()),
+	))
 }
 
 func getCryptoData(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	ctx, span := startSpan(r.Context(), "getCryptoData")
+	defer span.End()
+
 	symbol := mux.Vars(r)["symbol"]
+	span.SetAttributes(
+		attribute.String("crypto.symbol", symbol),
+		attribute.String("api.name", "coingecko"),
+	)
+
+	// Child span for API call
+	_, apiSpan := startChildSpan(ctx, "coingecko.markets")
+	defer apiSpan.End()
+
 	apiUrl := fmt.Sprintf("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h&ids=%s", symbol)
+	apiSpan.AddEvent("making API request", trace.WithAttributes(
+		attribute.String("url", apiUrl),
+	))
+
 	response, err := http.Get(apiUrl)
 	if err != nil {
+		apiSpan.SetStatus(codes.Error, "failed to fetch crypto data")
+		apiSpan.RecordError(err)
+		recordError(ctx, "getCryptoData", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		recordApiRequest(ctx, "/crypto/data", time.Since(start), http.StatusInternalServerError)
 		return
 	}
 	defer response.Body.Close()
+
 	var cryptoData []map[string]interface{}
-	err = json.NewDecoder(response.Body).Decode(&cryptoData)
-	if err != nil {
+	if err := json.NewDecoder(response.Body).Decode(&cryptoData); err != nil {
+		apiSpan.RecordError(err)
+		recordError(ctx, "getCryptoData_jsonDecode", err)
 		http.Error(w, "Failed to decode JSON", http.StatusInternalServerError)
+		recordApiRequest(ctx, "/crypto/data", time.Since(start), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(cryptoData)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(cryptoData); err != nil {
+		span.RecordError(err)
+		recordError(ctx, "getCryptoData_jsonEncode", err)
+		recordApiRequest(ctx, "/crypto/data", time.Since(start), http.StatusInternalServerError)
+		return
+	}
+
+	duration := time.Since(start)
+	recordApiRequest(ctx, "/crypto/data", duration, http.StatusOK)
+
+	span.AddEvent("request completed", trace.WithAttributes(
+		attribute.String("symbol", symbol),
+		attribute.Int64("response.time_ms", duration.Milliseconds()),
+	))
 }
 
+func randomCheck() {
+	fmt.Println("HELLOO")
+}
 func addToWatchlist(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Adding to watchlist")
+	start := time.Now()
+	ctx, span := startSpan(r.Context(), "addToWatchlist")
+	defer span.End()
+
+	// Child span for request parsing
+	_, parseSpan := startChildSpan(ctx, "parse_request")
+	defer parseSpan.End()
 
 	var data struct {
 		Symbol   string `json:"symbol"`
@@ -121,21 +290,62 @@ func addToWatchlist(w http.ResponseWriter, r *http.Request) {
 		Type     string `json:"type"`
 		CryptoId string `json:"cryptoId"`
 	}
-	err := json.NewDecoder(r.Body).Decode(&data)
-	fmt.Println("Data decoded", data)
-	if err != nil {
-		http.Error(w, "Failed to decode JSON", http.StatusInternalServerError)
+
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		parseSpan.RecordError(err)
+		recordError(ctx, "addToWatchlist_decode", err)
+		http.Error(w, "Failed to decode JSON", http.StatusBadRequest)
+		recordApiRequest(ctx, "/watchlist/add", time.Since(start), http.StatusBadRequest)
 		return
 	}
+
+	span.SetAttributes(
+		attribute.String("symbol", data.Symbol),
+		attribute.String("userId", data.UserId),
+		attribute.String("type", data.Type),
+	)
+
+	// Child span for database operation
+	dbCtx, dbSpan := instrumentDBCall(ctx, "create_watchlist_item")
+	defer dbSpan.End()
+
+	dbStart := time.Now()
+	var err error
 	if data.Type == "STOCK" {
 		new_symbol := UserSymbols{Symbol: data.Symbol, UserId: data.UserId, Type: "STOCK", CryptoId: ""}
-		DB.Create(&new_symbol)
+		err = DB.WithContext(dbCtx).Create(&new_symbol).Error
 	} else if data.Type == "CRYPTO" {
 		new_symbol := UserSymbols{Symbol: data.Symbol, UserId: data.UserId, Type: "CRYPTO", CryptoId: data.CryptoId}
-		DB.Create(&new_symbol)
+		err = DB.WithContext(dbCtx).Create(&new_symbol).Error
 	}
-	fmt.Println("Data added to watchlist", data)
-	json.NewEncoder(w).Encode(data)
+
+	if err != nil {
+		dbSpan.RecordError(err)
+		recordError(ctx, "addToWatchlist_dbCreate", err)
+		http.Error(w, "Failed to create watchlist item", http.StatusInternalServerError)
+		recordApiRequest(ctx, "/watchlist/add", time.Since(start), http.StatusInternalServerError)
+		return
+	}
+
+	dbDuration := time.Since(dbStart)
+	recordDBOperation(ctx, "create_watchlist_item", dbDuration, nil)
+	watchlistAddCounter.Add(ctx, 1)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		span.RecordError(err)
+		recordError(ctx, "addToWatchlist_jsonEncode", err)
+		return
+	}
+
+	duration := time.Since(start)
+	recordApiRequest(ctx, "/watchlist/add", duration, http.StatusOK)
+
+	span.AddEvent("request completed", trace.WithAttributes(
+		attribute.String("symbol", data.Symbol),
+		attribute.String("type", data.Type),
+		attribute.Int64("response.time_ms", duration.Milliseconds()),
+	))
 }
 
 func getWatchlist(w http.ResponseWriter, r *http.Request) {
