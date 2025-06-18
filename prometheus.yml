@@ -8,7 +8,12 @@ scrape_configs:
       - targets: ['host.docker.internal:2222']
     metrics_path: '/metrics'
     scheme: 'http'
-
+    scrape_interval: 5s
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: '.*otel.*'
+        action: keep 
+        
   - job_name: 'node-exporter'
     static_configs:
       - targets: ['node-exporter:9100']
@@ -21,12 +26,3 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9090']
 
-  - job_name: 'stock-tracker-otel'
-    static_configs:
-      - targets: ['host.docker.internal:2222']
-    metrics_path: '/metrics'
-    scrape_interval: 5s
-    metric_relabel_configs:
-      - source_labels: [__name__]
-        regex: '.*otel.*'
-        action: keep 

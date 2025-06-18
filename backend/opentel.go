@@ -5,326 +5,161 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"runtime"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	otelprometheus "go.opentelemetry.io/otel/exporters/prometheus"
-	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/metric"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
-	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
 var (
-	tracer trace.Tracer
-	meter  metric.Meter
-
-	// Application Metrics
-	watchlistAddCounter   metric.Int64Counter
-	watchlistErrorCounter metric.Int64Counter
-	apiRequestCounter     metric.Int64Counter
-	apiLatencyHistogram   metric.Float64Histogram
-	dbOperationCounter    metric.Int64Counter
-	dbLatencyHistogram    metric.Float64Histogram
-
-	// System Metrics
-	memoryUsageGauge   metric.Float64ObservableGauge
-	cpuUsageGauge      metric.Float64ObservableGauge
-	appGoroutinesGauge metric.Int64ObservableGauge
-	gcPauseLatency     metric.Float64Histogram
+	httpRequestCount        metric.Int64Counter
+	watchlistAddAttempts    metric.Int64Counter
+	watchlistFailedAddCount metric.Int64Counter
+	externalAPICallDuration metric.Float64Histogram
 )
 
-func initTelemetry() {
-	// Create resource
-	resource := resource.NewWithAttributes(
-		semconv.SchemaURL,
-		semconv.ServiceName("stock-tracker"),
-		semconv.ServiceVersion("0.1.0"),
-		attribute.String("environment", "development"),
-	)
+var (
+	metricsServer  *http.Server
+	tracerProvider *trace.TracerProvider
+	meterProvider  *sdkmetric.MeterProvider
+)
 
-	// Initialize tracer
-	traceExporter, err := stdouttrace.New(
-		stdouttrace.WithPrettyPrint(),
-		stdouttrace.WithoutTimestamps(),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
+func initTelemetry() (func(), error) {
+	ctx := context.Background()
 
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithSyncer(traceExporter),
-		sdktrace.WithResource(resource),
-		sdktrace.WithSampler(sdktrace.AlwaysSample()),
-	)
-	otel.SetTracerProvider(tp)
-	tracer = tp.Tracer("stock-tracker")
-
-	// Create Prometheus registry and exporter
-	registry := prometheus.NewRegistry()
-
-	// Add Go collectors including GC stats
-	registry.MustRegister(
-		collectors.NewGoCollector(),
-		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
-	)
-
-	promExporter, err := otelprometheus.New(
-		otelprometheus.WithRegisterer(registry),
-		otelprometheus.WithoutUnits(),
-		otelprometheus.WithoutScopeInfo(),
-		otelprometheus.WithoutTargetInfo(),
+	res, err := resource.Merge(
+		resource.Default(),
+		resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String("stock-tracker-service"),
+			semconv.ServiceVersionKey.String("0.1.0"),
+			attribute.String("environment", "development"),
+		),
 	)
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
 
-	// Initialize metrics with Prometheus
-	mp := sdkmetric.NewMeterProvider(
+	traceExporter, err := otlptracehttp.New(ctx,
+		otlptracehttp.WithEndpoint("localhost:4318"),
+		otlptracehttp.WithInsecure(),
+		otlptracehttp.WithURLPath("/v1/traces"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OTLP trace exporter: %w", err)
+	}
+
+	bsp := trace.NewBatchSpanProcessor(traceExporter)
+
+	tracerProvider = trace.NewTracerProvider(
+		trace.WithResource(res),
+		trace.WithSampler(trace.AlwaysSample()),
+		trace.WithSpanProcessor(bsp),
+	)
+	otel.SetTracerProvider(tracerProvider)
+
+	promExporter, err := otelprometheus.New()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Prometheus exporter: %w", err)
+	}
+
+	meterProvider = sdkmetric.NewMeterProvider(
+		sdkmetric.WithResource(res),
 		sdkmetric.WithReader(promExporter),
-		sdkmetric.WithResource(resource),
 	)
-	otel.SetMeterProvider(mp)
-	meter = mp.Meter("stock-tracker")
+	otel.SetMeterProvider(meterProvider)
 
-	// Create application metric instruments
-	watchlistAddCounter, err = meter.Int64Counter(
-		"watchlist_additions_total",
-		metric.WithDescription("Total number of items added to watchlist."),
-		metric.WithUnit("1"),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
+	meter := otel.Meter("stock-tracker-service")
 
-	watchlistErrorCounter, err = meter.Int64Counter(
-		"watchlist_errors_total",
-		metric.WithDescription("Total number of errors in watchlist operations."),
-		metric.WithUnit("1"),
+	httpRequestCount, err = meter.Int64Counter(
+		"app.http.request_count",
+		metric.WithDescription("Total number of successful HTTP requests handled by the application."),
+		metric.WithUnit("{request}"),
 	)
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("failed to create app.http.request_count instrument: %w", err)
 	}
 
-	apiRequestCounter, err = meter.Int64Counter(
-		"api_requests_total",
-		metric.WithDescription("Total number of API requests."),
-		metric.WithUnit("1"),
+	watchlistAddAttempts, err = meter.Int64Counter(
+		"app.watchlist.add_attempts",
+		metric.WithDescription("Total attempts to add an item to the watchlist."),
+		metric.WithUnit("{attempt}"),
 	)
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("failed to create app.watchlist.add_attempts instrument: %w", err)
 	}
 
-	apiLatencyHistogram, err = meter.Float64Histogram(
-		"api_request_duration_seconds",
-		metric.WithDescription("API request latency distribution."),
+	watchlistFailedAddCount, err = meter.Int64Counter(
+		"app.watchlist.failed_add_count",
+		metric.WithDescription("Number of failed attempts to add an item to the watchlist."),
+		metric.WithUnit("{failure}"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create app.watchlist.failed_add_count instrument: %w", err)
+	}
+
+	externalAPICallDuration, err = meter.Float64Histogram(
+		"app.external.api_call_duration",
+		metric.WithDescription("Duration of external stock data API calls."),
 		metric.WithUnit("s"),
+		metric.WithExplicitBucketBoundaries(0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0),
 	)
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("failed to create app.external.api_call_duration instrument: %w", err)
+	}
+	log.Println("Application metrics instruments initialized.")
+
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+
+	metricsServer = &http.Server{
+		Addr:    ":2222",
+		Handler: mux,
 	}
 
-	dbOperationCounter, err = meter.Int64Counter(
-		"db_operations_total",
-		metric.WithDescription("Total number of database operations."),
-		metric.WithUnit("1"),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	dbLatencyHistogram, err = meter.Float64Histogram(
-		"db_operation_duration_seconds",
-		metric.WithDescription("Database operation latency distribution."),
-		metric.WithUnit("s"),
-		metric.WithExplicitBucketBoundaries(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Create system metric instruments
-	memoryUsageGauge, err = meter.Float64ObservableGauge(
-		"process_memory_bytes",
-		metric.WithDescription("Current memory usage of the process."),
-		metric.WithUnit("bytes"),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	cpuUsageGauge, err = meter.Float64ObservableGauge(
-		"process_cpu_usage",
-		metric.WithDescription("Current CPU usage percentage."),
-		metric.WithUnit("percent"),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	appGoroutinesGauge, err = meter.Int64ObservableGauge(
-		"app_goroutines_total",
-		metric.WithDescription("Number of goroutines that currently exist in the application."),
-		metric.WithUnit("1"),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	gcPauseLatency, err = meter.Float64Histogram(
-		"gc_pause_latency_seconds",
-		metric.WithDescription("GC pause latency distribution."),
-		metric.WithUnit("s"),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Register callbacks for system metrics with exemplars
-	_, err = meter.RegisterCallback(
-		func(ctx context.Context, o metric.Observer) error {
-			var m runtime.MemStats
-			runtime.ReadMemStats(&m)
-
-			// Record memory metrics with exemplars
-			o.ObserveFloat64(memoryUsageGauge, float64(m.Alloc),
-				metric.WithAttributes(
-					attribute.String("type", "heap"),
-					attribute.Int64("gc_num", int64(m.NumGC)),
-				))
-
-			// Record CPU usage with exemplars
-			cpuUsage := getCPUUsage()
-			o.ObserveFloat64(cpuUsageGauge, cpuUsage,
-				metric.WithAttributes(
-					attribute.Int("num_cpu", runtime.NumCPU()),
-				))
-
-			// Record goroutines count with exemplars
-			o.ObserveInt64(appGoroutinesGauge, int64(runtime.NumGoroutine()),
-				metric.WithAttributes(
-					attribute.String("type", "total"),
-				))
-
-			// Record GC pause time with exemplars
-			if m.NumGC > 0 {
-				gcPauseLatency.Record(ctx, float64(m.PauseNs[(m.NumGC+255)%256])/1e9,
-					metric.WithAttributes(
-						attribute.Int64("gc_num", int64(m.NumGC)),
-						attribute.Int64("gc_cpu_fraction", int64(m.GCCPUFraction*100)),
-					))
-			}
-
-			return nil
-		},
-		memoryUsageGauge,
-		cpuUsageGauge,
-		appGoroutinesGauge,
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Start Prometheus HTTP endpoint
 	go func() {
-		mux := http.NewServeMux()
-		mux.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{
-			EnableOpenMetrics: true,
-		}))
-		server := &http.Server{
-			Addr:    ":2222",
-			Handler: mux,
-		}
-		log.Printf("Prometheus metrics endpoint started at :2222/metrics")
-		if err := server.ListenAndServe(); err != nil {
+		log.Printf("Prometheus metrics endpoint starting at %s/metrics", metricsServer.Addr)
+		if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Printf("Prometheus HTTP server error: %v", err)
 		}
 	}()
 
-	log.Println("Telemetry initialized with Prometheus metrics endpoint")
-}
+	log.Println("OpenTelemetry initialization complete. Traces go to OTLP, Metrics go to Prometheus endpoint.")
 
-// Helper function to get CPU usage
-func getCPUUsage() float64 {
-	var cpuStats runtime.MemStats
-	runtime.ReadMemStats(&cpuStats)
-	return float64(cpuStats.Sys) / float64(runtime.NumCPU())
-}
+	return func() {
 
-// Helper functions for instrumentation
-func startSpan(ctx context.Context, name string) (context.Context, trace.Span) {
-	return tracer.Start(ctx, name,
-		trace.WithAttributes(
-			attribute.String("service.name", "stock-tracker"),
-			attribute.String("span.type", "request"),
-		),
-	)
-}
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 
-func startChildSpan(ctx context.Context, name string) (context.Context, trace.Span) {
-	parentSpan := trace.SpanFromContext(ctx)
-	if parentSpan.IsRecording() {
-		return tracer.Start(ctx, name,
-			trace.WithAttributes(
-				attribute.String("parent.name", parentSpan.SpanContext().SpanID().String()),
-			),
-		)
-	}
-	return startSpan(ctx, name)
-}
+		if tracerProvider != nil {
+			log.Println("Shutting down OpenTelemetry Trace Provider...")
+			if err := tracerProvider.Shutdown(shutdownCtx); err != nil {
+				log.Printf("Error shutting down trace provider: %v", err)
+			}
+		}
 
-func recordApiRequest(ctx context.Context, endpoint string, duration time.Duration, statusCode int) {
-	apiRequestCounter.Add(ctx, 1,
-		metric.WithAttributes(
-			attribute.String("endpoint", endpoint),
-			attribute.Int("status_code", statusCode),
-		),
-	)
+		if meterProvider != nil {
+			log.Println("Shutting down OpenTelemetry Meter Provider...")
+			if err := meterProvider.Shutdown(shutdownCtx); err != nil {
+				log.Printf("Error shutting down meter provider: %v", err)
+			}
+		}
 
-	apiLatencyHistogram.Record(ctx, float64(duration.Seconds()),
-		metric.WithAttributes(
-			attribute.String("endpoint", endpoint),
-		),
-	)
-}
+		if metricsServer != nil {
+			log.Println("Shutting down Prometheus metrics server...")
+			if err := metricsServer.Shutdown(shutdownCtx); err != nil {
+				log.Printf("Error shutting down metrics server: %v", err)
+			}
+		}
 
-func recordDBOperation(ctx context.Context, operation string, duration time.Duration, err error) {
-	dbOperationCounter.Add(ctx, 1,
-		metric.WithAttributes(
-			attribute.String("operation", operation),
-			attribute.Bool("success", err == nil),
-		),
-	)
-	fmt.Println("recording db operation", operation, duration, err)
-	dbLatencyHistogram.Record(ctx, float64(duration.Seconds()),
-		metric.WithAttributes(
-			attribute.String("operation", operation),
-		),
-	)
-}
-
-func recordError(ctx context.Context, operation string, err error) {
-	watchlistErrorCounter.Add(ctx, 1,
-		metric.WithAttributes(
-			attribute.String("operation", operation),
-			attribute.String("error", err.Error()),
-		),
-	)
-}
-
-func instrumentDBCall(ctx context.Context, operation string) (context.Context, trace.Span) {
-	ctx, span := startChildSpan(ctx, "db."+operation)
-	span.SetAttributes(
-		attribute.String("db.type", "postgres"),
-		attribute.String("db.operation", operation),
-	)
-	return ctx, span
+		log.Println("OpenTelemetry shutdown completed.")
+	}, nil
 }

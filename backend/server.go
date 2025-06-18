@@ -1,80 +1,78 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/gorilla/mux"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/contrib/instrumentation/runtime"
 )
-
-func instrumentHandler(handler http.HandlerFunc, endpoint string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		startTime := time.Now()
-		ctx, span := startSpan(r.Context(), fmt.Sprintf("HTTP %s", endpoint))
-		defer span.End()
-
-		// Add the trace context to the request
-		r = r.WithContext(ctx)
-
-		// Create a response wrapper to capture the status code
-		rw := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
-
-		// Execute the handler
-		handler(rw, r)
-
-		// Record metrics with exemplar (trace ID)
-		duration := time.Since(startTime).Seconds()
-		apiLatencyHistogram.Record(ctx, duration,
-			metric.WithAttributes(
-				attribute.String("endpoint", endpoint),
-				attribute.Int("status_code", rw.statusCode),
-			))
-
-		apiRequestCounter.Add(ctx, 1,
-			metric.WithAttributes(
-				attribute.String("endpoint", endpoint),
-				attribute.Int("status_code", rw.statusCode),
-			))
-	}
-}
-
-// responseWriter is a wrapper for http.ResponseWriter that captures the status code
-type responseWriter struct {
-	http.ResponseWriter
-	statusCode int
-}
-
-func (rw *responseWriter) WriteHeader(code int) {
-	rw.statusCode = code
-	rw.ResponseWriter.WriteHeader(code)
-}
 
 func main() {
 	router := mux.NewRouter()
 	fmt.Println("Starting..")
 
-	// Initialize telemetry first
-	initTelemetry()
+	shutdown, err := initTelemetry()
+	if err != nil {
+		log.Fatal("Failed to initialize telemetry:", err)
+	}
+	defer shutdown()
 	fmt.Println("Telemetry initialized")
 
-	// Then initialize database
-	initDB()
+	if err := runtime.Start(runtime.WithMinimumReadMemStatsInterval(time.Second)); err != nil {
+		log.Fatal("Failed to start runtime metrics:", err)
+	}
+	fmt.Println("Runtime metrics started")
+
+	//this is for auto instrumentation of routes
+	// router.Use(otelmux.Middleware("stock-tracker"))
+
+	router.Use(PrometheusMiddleware())
+
+	if err := initDB(); err != nil {
+		log.Fatal("Failed to initialize database:", err)
+	}
+
+	defer CloseDB()
 	fmt.Println("Database initialized")
 
-	// Instrument all endpoints
-	router.HandleFunc("/stocks/symbols", instrumentHandler(getAllStockSymbols, "/stocks/symbols")).Methods("GET")
-	router.HandleFunc("/stocks/{symbol}", instrumentHandler(getStockData, "/stocks/{symbol}")).Methods("GET")
-	router.HandleFunc("/crypto/symbols", instrumentHandler(getAllCryptoSymbols, "/crypto/symbols")).Methods("GET")
-	router.HandleFunc("/crypto/{symbol}", instrumentHandler(getCryptoData, "/crypto/{symbol}")).Methods("GET")
-	router.HandleFunc("/watchlist/add", instrumentHandler(addToWatchlist, "/watchlist/add")).Methods("POST")
-	router.HandleFunc("/watchlist/{userId}", instrumentHandler(getWatchlist, "/watchlist/{userId}")).Methods("GET")
-	router.HandleFunc("/watchlist/remove/{userId}/{symbol}",
-		instrumentHandler(removeFromWatchlist, "/watchlist/remove/{userId}/{symbol}")).Methods("POST")
+	router.HandleFunc("/stocks/symbols", getAllStockSymbols).Methods("GET")
+	router.HandleFunc("/stocks/{symbol}", getStockData).Methods("GET")
+	router.HandleFunc("/crypto/symbols", getAllCryptoSymbols).Methods("GET")
+	router.HandleFunc("/crypto/{symbol}", getCryptoData).Methods("GET")
+	router.HandleFunc("/watchlist/add", addToWatchlist).Methods("POST")
+	router.HandleFunc("/watchlist/{userId}", getWatchlist).Methods("GET")
+	router.HandleFunc("/watchlist/remove/{userId}/{symbol}", removeFromWatchlist).Methods("POST")
 
-	fmt.Println("Server starting on :8000")
-	log.Fatal(http.ListenAndServe(":8000", router))
+	server := &http.Server{
+		Addr:    ":8000",
+		Handler: router,
+	}
+
+	go func() {
+		fmt.Println("Server starting on :8000")
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal("Server failed to start:", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	fmt.Println("Shutting down server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		log.Fatal("Server forced to shutdown:", err)
+	}
+
+	fmt.Println("Server exited")
 }

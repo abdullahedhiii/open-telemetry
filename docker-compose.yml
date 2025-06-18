@@ -13,6 +13,8 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
+    # Use host.docker.internal to reach services running directly on the host machine
+    # If your Go app is running inside another container, you'd use the service name.
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -29,6 +31,7 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
     depends_on:
       - prometheus
+      - jaeger # Grafana can integrate with Jaeger for traces
 
   node-exporter:
     image: prom/node-exporter:latest
@@ -58,5 +61,20 @@ services:
     depends_on:
       - prometheus
 
+  jaeger: # New service for Jaeger
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver (your Go app sends to this)
+      - "14268:14268" # Jaeger Thrift HTTP receiver (legacy, but often useful to expose)
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true # Explicitly enable OTLP receiver (though often on by default in recent all-in-one)
+    # If your Go application is running inside a Docker container on the same network
+    # as Jaeger, you would configure its OTEL_EXPORTER_OTLP_ENDPOINT to "http://jaeger:4318".
+    # Since your Go app is likely running directly on the host (based on previous examples),
+    # it uses "localhost:4318" which maps to the container's published port.
+
 volumes:
-  grafana-storage: {} 
+  grafana-storage: {}
