@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"runtime"
@@ -144,6 +145,7 @@ func initTelemetry() {
 		"db_operation_duration_seconds",
 		metric.WithDescription("Database operation latency distribution."),
 		metric.WithUnit("s"),
+		metric.WithExplicitBucketBoundaries(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10),
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -301,7 +303,7 @@ func recordDBOperation(ctx context.Context, operation string, duration time.Dura
 			attribute.Bool("success", err == nil),
 		),
 	)
-
+	fmt.Println("recording db operation", operation, duration, err)
 	dbLatencyHistogram.Record(ctx, float64(duration.Seconds()),
 		metric.WithAttributes(
 			attribute.String("operation", operation),
