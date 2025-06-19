@@ -9,10 +9,11 @@ scrape_configs:
     metrics_path: '/metrics'
     scheme: 'http'
     scrape_interval: 5s
-    metric_relabel_configs:
-      - source_labels: [__name__]
-        regex: '.*otel.*'
-        action: keep 
+    #to remove any custom metrics
+    # metric_relabel_configs:
+    #   - source_labels: [__name__]
+    #     regex: '.*otel.*'
+    #     action: keep 
         
   - job_name: 'node-exporter'
     static_configs:

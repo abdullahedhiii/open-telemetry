@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/uptrace/opentelemetry-go-extra/otelgorm"
-	"go.opentelemetry.io/otel"
+	_ "go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
@@ -19,11 +19,6 @@ import (
 )
 
 var DB *gorm.DB
-
-var (
-	dbQueryDuration metric.Float64Histogram
-	dbQueryCount    metric.Int64Counter
-)
 
 type UserSymbols struct {
 	gorm.Model
@@ -73,27 +68,6 @@ func initDB() error {
 
 	if err := sqlDB.Ping(); err != nil {
 		return fmt.Errorf("error pinging database: %w", err)
-	}
-
-	meter := otel.Meter("stock-tracker-db-metrics")
-
-	dbQueryDuration, err = meter.Float64Histogram(
-		"db.query.duration",
-		metric.WithDescription("Measures the duration of database queries."),
-		metric.WithUnit("s"),
-		metric.WithExplicitBucketBoundaries(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create db.query.duration instrument: %w", err)
-	}
-
-	dbQueryCount, err = meter.Int64Counter(
-		"db.query.count",
-		metric.WithDescription("Measures the number of database queries."),
-		metric.WithUnit("{query}"),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create db.query.count instrument: %w", err)
 	}
 
 	if err := DB.Use(otelgorm.NewPlugin(

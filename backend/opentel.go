@@ -24,6 +24,8 @@ var (
 	watchlistAddAttempts    metric.Int64Counter
 	watchlistFailedAddCount metric.Int64Counter
 	externalAPICallDuration metric.Float64Histogram
+	dbQueryCount            metric.Int64Counter
+	dbQueryDuration         metric.Float64Histogram
 )
 
 var (
@@ -80,7 +82,7 @@ func initTelemetry() (func(), error) {
 	meter := otel.Meter("stock-tracker-service")
 
 	httpRequestCount, err = meter.Int64Counter(
-		"app.http.request_count",
+		"app_http_request_count",
 		metric.WithDescription("Total number of successful HTTP requests handled by the application."),
 		metric.WithUnit("{request}"),
 	)
@@ -88,8 +90,26 @@ func initTelemetry() (func(), error) {
 		return nil, fmt.Errorf("failed to create app.http.request_count instrument: %w", err)
 	}
 
+	dbQueryCount, err = meter.Int64Counter(
+		"app_db_query_count",
+		metric.WithDescription("Total number of database queries executed by the application."),
+		metric.WithUnit("{request}"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create app.db.query_count instrument: %w", err)
+	}
+
+	dbQueryDuration, err = meter.Float64Histogram(
+		"app_db_query_duration",
+		metric.WithDescription("Duration of database queries executed by the application."),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create app.db.query_duration instrument: %w", err)
+	}
+
 	watchlistAddAttempts, err = meter.Int64Counter(
-		"app.watchlist.add_attempts",
+		"app_watchlist_add_attempts",
 		metric.WithDescription("Total attempts to add an item to the watchlist."),
 		metric.WithUnit("{attempt}"),
 	)
@@ -98,7 +118,7 @@ func initTelemetry() (func(), error) {
 	}
 
 	watchlistFailedAddCount, err = meter.Int64Counter(
-		"app.watchlist.failed_add_count",
+		"app_watchlist_failed_add_count",
 		metric.WithDescription("Number of failed attempts to add an item to the watchlist."),
 		metric.WithUnit("{failure}"),
 	)
@@ -107,7 +127,7 @@ func initTelemetry() (func(), error) {
 	}
 
 	externalAPICallDuration, err = meter.Float64Histogram(
-		"app.external.api_call_duration",
+		"app_external_api_call_duration",
 		metric.WithDescription("Duration of external stock data API calls."),
 		metric.WithUnit("s"),
 		metric.WithExplicitBucketBoundaries(0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0),
