@@ -6,6 +6,11 @@ RUN go mod download
 RUN go build -o backend
 
 FROM alpine:3.20
+
+RUN apk add --no-cache ca-certificates
+COPY ./certificates/mycert.crt /usr/local/share/ca-certificates/mycert.crt
+RUN update-ca-certificates
+
 WORKDIR /app
 COPY --from=builder /app/backend .
 

@@ -101,20 +101,24 @@ services:
     build: ./fluentd
     container_name: fluentd
     ports:
-      - "24224:24224"
-      - "24224:24224/udp"
+    - "24224:24224"
+    - "24224:24224/udp"
     volumes:
-      - ./fluentd/fluent.conf:/fluentd/etc/fluent.conf
-      - ./fluentd/log:/fluentd/log
+    - ./fluentd/fluentd.conf:/fluentd/etc/fluent.conf
+    - ./fluentd/log:/fluentd/log
+    - ./fluentd/wait-for-es.sh:/wait-for-es.sh
+    entrypoint: ["/wait-for-es.sh"]
     environment:
-      - FLUENT_ELASTICSEARCH_HOST=elasticsearch
-      - FLUENT_ELASTICSEARCH_PORT=9200
+    - FLUENT_ELASTICSEARCH_HOST=elasticsearch
+    - FLUENT_ELASTICSEARCH_PORT=9200
     depends_on:
-      - elasticsearch
+     elasticsearch:
+       condition: service_healthy
 
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: elasticsearch
     environment:
       - discovery.type=single-node
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
@@ -123,6 +127,11 @@ services:
       - "9200:9200"
     volumes:
       - esdata:/usr/share/elasticsearch/data
+    healthcheck:
+     test: curl -s http://localhost:9200 || exit 1
+     interval: 10s
+     timeout: 5s
+     retries: 5
 
   kibana:
     image: docker.elastic.co/kibana/kibana:8.13.4
