@@ -28,6 +28,8 @@ func getAllStockSymbols(w http.ResponseWriter, r *http.Request) {
 
 	r = r.WithContext(ctx)
 
+	Logger.InfoContext(ctx, "Handler execution started", "method", r.Method, "target", r.URL.Path)
+
 	span.SetAttributes(
 		attribute.String("http.method", r.Method),
 		attribute.String("http.target", r.URL.Path),
@@ -54,6 +56,8 @@ func getAllStockSymbols(w http.ResponseWriter, r *http.Request) {
 	response, err := http.Get(apiUrl)
 	apiCallDuration := time.Since(apiCallStartTime).Seconds()
 
+	Logger.InfoContext(ctx, "External API call made", "url", apiUrl, "duration_sec", apiCallDuration, "error", err)
+
 	externalAPICallDuration.Record(ctx, apiCallDuration, metric.WithAttributes(
 		attribute.String("api.name", "alphavantage_api"),
 		attribute.String("api.operation", "LISTING_STATUS"),
@@ -67,6 +71,7 @@ func getAllStockSymbols(w http.ResponseWriter, r *http.Request) {
 		span.SetStatus(codes.Error, fmt.Sprintf("External API call failed: %v", err))
 		span.RecordError(err)
 
+		Logger.ErrorContext(ctx, "HTTP GET to AlphaVantage failed", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -83,6 +88,7 @@ func getAllStockSymbols(w http.ResponseWriter, r *http.Request) {
 
 		apiCallSpan.SetStatus(codes.Error, errorMsg)
 		span.SetStatus(codes.Error, errorMsg)
+		Logger.ErrorContext(ctx, "AlphaVantage returned non-OK status", "status_code", response.StatusCode, "body", string(bodyBytes))
 		http.Error(w, errorMsg, response.StatusCode)
 		return
 	}
@@ -106,6 +112,7 @@ func getAllStockSymbols(w http.ResponseWriter, r *http.Request) {
 			readCsvSpan.RecordError(err)
 			span.SetStatus(codes.Error, fmt.Sprintf("CSV processing failed: %v", err))
 			span.RecordError(err)
+			Logger.ErrorContext(ctx, "CSV parsing error", "error", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -116,17 +123,20 @@ func getAllStockSymbols(w http.ResponseWriter, r *http.Request) {
 	readCsvSpan.SetAttributes(attribute.Int("symbols.active_count", len(symbols)))
 	readCsvSpan.SetStatus(codes.Ok, "CSV parsing complete")
 
+	Logger.InfoContext(ctx, "CSV parsing complete", "active_symbols_count", len(symbols))
+
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(symbols); err != nil {
 		span.SetStatus(codes.Error, fmt.Sprintf("Failed to encode JSON response: %v", err))
 		span.RecordError(err)
+		Logger.ErrorContext(ctx, "Failed to encode JSON response", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	span.SetStatus(codes.Ok, "Stock symbols retrieved successfully")
 	span.AddEvent("Response sent")
-	json.NewEncoder(w).Encode(symbols)
+	Logger.InfoContext(ctx, "Stock symbols retrieved and response sent", "count", len(symbols))
 }
 
 func getStockData(w http.ResponseWriter, r *http.Request) {

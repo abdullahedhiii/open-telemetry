@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -32,10 +34,22 @@ var (
 	metricsServer  *http.Server
 	tracerProvider *trace.TracerProvider
 	meterProvider  *sdkmetric.MeterProvider
+	Logger         *slog.Logger
 )
 
 func initTelemetry() (func(), error) {
 	ctx := context.Background()
+
+	logDir := "/fluentd/log"
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create log dir: %w", err)
+	}
+	logFile, err := os.OpenFile(logDir+"/app.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open log file: %w", err)
+	}
+	Logger = slog.New(slog.NewJSONHandler(logFile, nil))
+	Logger.Info("Logger initialized", "service", "otel-backend")
 
 	res, err := resource.Merge(
 		resource.Default(),
@@ -51,7 +65,7 @@ func initTelemetry() (func(), error) {
 	}
 
 	traceExporter, err := otlptracehttp.New(ctx,
-		otlptracehttp.WithEndpoint("localhost:4318"),
+		otlptracehttp.WithEndpoint("jaeger:4318"),
 		otlptracehttp.WithInsecure(),
 		otlptracehttp.WithURLPath("/v1/traces"),
 	)

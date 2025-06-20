@@ -1,0 +1,20 @@
+{"time":"2025-06-19T10:56:51.106078537Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-19T11:07:17.932550433Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-19T11:10:53.026945823Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-19T11:14:27.832917665Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-19T11:22:24.816731432Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-19T11:46:23.804901988Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-19T11:51:44.079909087Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-19T11:55:45.169847526Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-19T11:59:55.855157441Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-19T12:00:54.234957724Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-19T12:04:53.992269036Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-19T12:05:26.304364819Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-19T12:05:26.894983487Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":0.590270254,"error":"Get \"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD\": tls: failed to verify certificate: x509: certificate signed by unknown authority"}
+{"time":"2025-06-19T12:05:26.895410384Z","level":"ERROR","msg":"HTTP GET to AlphaVantage failed","error":"Get \"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD\": tls: failed to verify certificate: x509: certificate signed by unknown authority"}
+{"time":"2025-06-19T17:24:48.262965531Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-20T05:40:59.988487395Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-20T05:41:51.127689132Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-20T05:41:51.904089303Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":0.774847982,"error":"Get \"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD\": tls: failed to verify certificate: x509: certificate signed by unknown authority"}
+{"time":"2025-06-20T05:41:51.90521251Z","level":"ERROR","msg":"HTTP GET to AlphaVantage failed","error":"Get \"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD\": tls: failed to verify certificate: x509: certificate signed by unknown authority"}
+{"time":"2025-06-20T05:45:40.055612Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}

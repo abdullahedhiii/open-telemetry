@@ -1,6 +1,31 @@
 version: '3.8'
 
 services:
+  backend: 
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: backend
+    ports:
+      - "8000:8000"
+      - "2222:2222" 
+    volumes:
+      - ./fluentd/log:/fluentd/log
+    depends_on:
+      # - postgres
+      - fluentd
+
+  # postgres:
+  #   image: postgres:16
+  #   environment:
+  #     POSTGRES_USER: abdullah
+  #     POSTGRES_PASSWORD: edhi
+  #     POSTGRES_DB: mydb1
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - pgdata:/var/lib/postgresql/data
+
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
@@ -71,10 +96,44 @@ services:
       - "14268:14268" # Jaeger Thrift HTTP receiver (legacy, but often useful to expose)
     environment:
       - COLLECTOR_OTLP_ENABLED=true # Explicitly enable OTLP receiver (though often on by default in recent all-in-one)
-    # If your Go application is running inside a Docker container on the same network
-    # as Jaeger, you would configure its OTEL_EXPORTER_OTLP_ENDPOINT to "http://jaeger:4318".
-    # Since your Go app is likely running directly on the host (based on previous examples),
-    # it uses "localhost:4318" which maps to the container's published port.
+    
+  fluentd:
+    build: ./fluentd
+    container_name: fluentd
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    volumes:
+      - ./fluentd/fluent.conf:/fluentd/etc/fluent.conf
+      - ./fluentd/log:/fluentd/log
+    environment:
+      - FLUENT_ELASTICSEARCH_HOST=elasticsearch
+      - FLUENT_ELASTICSEARCH_PORT=9200
+    depends_on:
+      - elasticsearch
+
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.4
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
 
 volumes:
+  esdata:
+  pgdata:
   grafana-storage: {}
