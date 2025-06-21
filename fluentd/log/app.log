@@ -52,3 +52,34 @@
 {"time":"2025-06-20T11:04:39.118273387Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":3.601002253,"error":null}
 {"time":"2025-06-20T11:04:40.073224631Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11858}
 {"time":"2025-06-20T11:04:40.07427575Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11858}
+{"time":"2025-06-21T07:23:58.325803699Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-21T07:25:41.456851875Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/crypto/symbols"}
+{"time":"2025-06-21T07:25:43.242277863Z","level":"INFO","msg":"External API call completed","url":"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h","duration_sec":1.7829325379999998,"error_present":false}
+{"time":"2025-06-21T07:25:43.24299447Z","level":"INFO","msg":"Coingecko API call successful for crypto symbols","api_url":"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h","status_code":200}
+{"time":"2025-06-21T07:25:43.24345721Z","level":"INFO","msg":"Starting JSON decoding for crypto symbols response"}
+{"time":"2025-06-21T07:25:43.660027847Z","level":"INFO","msg":"JSON decoding complete for crypto symbols response"}
+{"time":"2025-06-21T07:25:43.660921263Z","level":"INFO","msg":"Processed crypto data","total_coins":100,"valid_symbols_extracted":100}
+{"time":"2025-06-21T07:25:43.662410705Z","level":"INFO","msg":"Crypto symbols retrieved and response sent","count":100}
+{"time":"2025-06-21T10:51:46.884109409Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/crypto/symbols"}
+{"time":"2025-06-21T10:51:48.001516321Z","level":"INFO","msg":"External API call completed","url":"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h","duration_sec":1.114320326,"error_present":false}
+{"time":"2025-06-21T10:51:48.003907714Z","level":"INFO","msg":"Coingecko API call successful for crypto symbols","api_url":"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h","status_code":200}
+{"time":"2025-06-21T10:51:48.004373405Z","level":"INFO","msg":"Starting JSON decoding for crypto symbols response"}
+{"time":"2025-06-21T10:51:48.160015481Z","level":"INFO","msg":"JSON decoding complete for crypto symbols response"}
+{"time":"2025-06-21T10:51:48.160481442Z","level":"INFO","msg":"Processed crypto data","total_coins":100,"valid_symbols_extracted":100}
+{"time":"2025-06-21T10:51:48.1608647Z","level":"INFO","msg":"Crypto symbols retrieved and response sent","count":100}
+{"time":"2025-06-21T10:53:40.165577178Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-21T11:14:27.468995681Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/crypto/symbols"}
+{"time":"2025-06-21T11:14:29.290918185Z","level":"INFO","msg":"External API call completed","url":"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h","duration_sec":1.819799723,"error_present":false}
+{"time":"2025-06-21T11:14:29.291286908Z","level":"INFO","msg":"Coingecko API call successful for crypto symbols","api_url":"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h","status_code":200}
+{"time":"2025-06-21T11:14:29.291962578Z","level":"INFO","msg":"Starting JSON decoding for crypto symbols response"}
+{"time":"2025-06-21T11:14:29.707184773Z","level":"INFO","msg":"JSON decoding complete for crypto symbols response"}
+{"time":"2025-06-21T11:14:29.707763637Z","level":"INFO","msg":"Processed crypto data","total_coins":100,"valid_symbols_extracted":100}
+{"time":"2025-06-21T11:14:29.709296836Z","level":"INFO","msg":"Crypto symbols retrieved and response sent","count":100}
+{"time":"2025-06-21T11:16:03.432778628Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/watchlist/add"}
+{"time":"2025-06-21T11:16:03.434800977Z","level":"INFO","msg":"Retrieving watchlist for user","userId":"add"}
+{"time":"2025-06-21T11:16:03.475459819Z","level":"INFO","msg":"Successfully retrieved watchlist from database","userId":"add","items_count":0}
+{"time":"2025-06-21T11:16:03.477803255Z","level":"INFO","msg":"Watchlist retrieved and response sent","userId":"add","count":0}
+{"time":"2025-06-21T11:16:36.933519724Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/watchlist/U-11"}
+{"time":"2025-06-21T11:16:36.933815432Z","level":"INFO","msg":"Retrieving watchlist for user","userId":"U-11"}
+{"time":"2025-06-21T11:16:36.943834022Z","level":"INFO","msg":"Successfully retrieved watchlist from database","userId":"U-11","items_count":2}
+{"time":"2025-06-21T11:16:36.945112002Z","level":"INFO","msg":"Watchlist retrieved and response sent","userId":"U-11","count":2}
