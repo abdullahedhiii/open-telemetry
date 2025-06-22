@@ -12,9 +12,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp" // Using HTTP exporter
 	otelprometheus "go.opentelemetry.io/otel/exporters/prometheus"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/propagation" // Import for context propagation
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
@@ -64,10 +65,13 @@ func initTelemetry() (func(), error) {
 		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
 
+	// Configure the OTLP HTTP trace exporter to send traces to the OpenTelemetry Collector
+	// The endpoint refers to the 'otel-collector' service name in docker-compose.yml
+	// and its OTLP HTTP port (4318), with the standard /v1/traces path.
 	traceExporter, err := otlptracehttp.New(ctx,
-		otlptracehttp.WithEndpoint("jaeger:4318"),
+		otlptracehttp.WithEndpoint("otel-collector:4318"), // Changed from jaeger:4318 to otel-collector:4318
 		otlptracehttp.WithInsecure(),
-		otlptracehttp.WithURLPath("/v1/traces"),
+		otlptracehttp.WithURLPath("/v1/traces"), // Ensure the correct OTLP HTTP path
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create OTLP trace exporter: %w", err)
@@ -81,6 +85,10 @@ func initTelemetry() (func(), error) {
 		trace.WithSpanProcessor(bsp),
 	)
 	otel.SetTracerProvider(tracerProvider)
+
+	// Set the global text map propagator for W3C Trace Context and Baggage
+	// This is crucial for context propagation between services (frontend to backend)
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 
 	promExporter, err := otelprometheus.New()
 	if err != nil {

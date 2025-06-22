@@ -83,3 +83,47 @@
 {"time":"2025-06-21T11:16:36.933815432Z","level":"INFO","msg":"Retrieving watchlist for user","userId":"U-11"}
 {"time":"2025-06-21T11:16:36.943834022Z","level":"INFO","msg":"Successfully retrieved watchlist from database","userId":"U-11","items_count":2}
 {"time":"2025-06-21T11:16:36.945112002Z","level":"INFO","msg":"Watchlist retrieved and response sent","userId":"U-11","count":2}
+{"time":"2025-06-21T15:25:10.159261184Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-21T16:00:27.756883962Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-22T08:18:18.48384875Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-22T08:21:04.937758919Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-22T08:21:08.71968931Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":3.780045848,"error":null}
+{"time":"2025-06-22T08:21:09.608575338Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11863}
+{"time":"2025-06-22T08:21:09.609312357Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11863}
+{"time":"2025-06-22T08:22:54.843431518Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-22T08:23:02.080604736Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":7.235805756,"error":null}
+{"time":"2025-06-22T08:23:02.928157487Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11863}
+{"time":"2025-06-22T08:23:02.930581103Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11863}
+{"time":"2025-06-22T08:27:14.719970888Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-22T08:27:22.607898735Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-22T08:27:26.288556965Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":3.680395367,"error":null}
+{"time":"2025-06-22T08:27:27.194274439Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11863}
+{"time":"2025-06-22T08:27:27.195978197Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11863}
+{"time":"2025-06-22T12:46:55.171467696Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-22T13:23:14.916073736Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-22T13:25:27.409428489Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/watchlist/U-11"}
+{"time":"2025-06-22T13:25:27.410542132Z","level":"INFO","msg":"Retrieving watchlist for user","userId":"U-11"}
+{"time":"2025-06-22T13:25:27.42769252Z","level":"INFO","msg":"Successfully retrieved watchlist from database","userId":"U-11","items_count":2}
+{"time":"2025-06-22T13:25:27.428040274Z","level":"INFO","msg":"Watchlist retrieved and response sent","userId":"U-11","count":2}
+{"time":"2025-06-22T13:26:24.446065837Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/watchlist/U-11"}
+{"time":"2025-06-22T13:26:24.446506588Z","level":"INFO","msg":"Retrieving watchlist for user","userId":"U-11"}
+{"time":"2025-06-22T13:26:24.454587746Z","level":"INFO","msg":"Successfully retrieved watchlist from database","userId":"U-11","items_count":2}
+{"time":"2025-06-22T13:26:24.455227516Z","level":"INFO","msg":"Watchlist retrieved and response sent","userId":"U-11","count":2}
+{"time":"2025-06-22T13:26:34.289640771Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-22T13:26:37.796528365Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":3.506274105,"error":null}
+{"time":"2025-06-22T13:26:38.785709611Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11863}
+{"time":"2025-06-22T13:26:38.786664984Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11863}
+{"time":"2025-06-22T13:43:05.735330326Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-22T13:43:22.631295956Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-22T13:43:26.188840761Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":3.556633227,"error":null}
+{"time":"2025-06-22T13:43:27.105616953Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11863}
+{"time":"2025-06-22T13:43:27.111570857Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11863}
+{"time":"2025-06-22T13:47:33.861287252Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-22T13:49:35.73486461Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-22T13:51:33.543788096Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-22T13:52:55.941720321Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-22T13:54:10.42891469Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-22T13:54:47.174141031Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-22T13:54:50.917254914Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":3.7423172449999997,"error":null}
+{"time":"2025-06-22T13:54:51.830291224Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11863}
+{"time":"2025-06-22T13:54:51.831107492Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11863}

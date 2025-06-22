@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/rs/cors"
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
 )
 
@@ -50,9 +51,17 @@ func main() {
 	router.HandleFunc("/watchlist/{userId}", getWatchlist).Methods("GET")
 	router.HandleFunc("/watchlist/remove/{userId}/{symbol}", removeFromWatchlist).Methods("POST")
 
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{"*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"*"},
+		AllowCredentials: true,
+	})
+
+	handler := c.Handler(router)
 	server := &http.Server{
 		Addr:    ":8000",
-		Handler: router,
+		Handler: handler,
 	}
 
 	go func() {

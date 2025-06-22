@@ -1,30 +1,38 @@
 version: '3.8'
 
 services:
-  backend: 
+  backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: backend
     ports:
       - "8000:8000"
-      - "2222:2222" 
+      - "2222:2222"
     volumes:
       - ./fluentd/log:/fluentd/log
     depends_on:
       # - postgres
       - fluentd
+      - otel-collector
+    # Make sure your backend code is configured to send OTLP traces to the otel-collector
+    # E.g., if using gRPC: OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+    # Or if using HTTP: OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
 
-  # postgres:
-  #   image: postgres:16
-  #   environment:
-  #     POSTGRES_USER: abdullah
-  #     POSTGRES_PASSWORD: edhi
-  #     POSTGRES_DB: mydb1
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - pgdata:/var/lib/postgresql/data
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:8000
+    container_name: frontend
+    ports:
+      - "6600:80"
+    depends_on:
+      - backend
+      - otel-collector
+    # Similar to backend, configure your frontend to send OTLP traces to the otel-collector
+    # E.g., if using HTTP: OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
 
   prometheus:
     image: prom/prometheus:latest
@@ -38,8 +46,6 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
-    # Use host.docker.internal to reach services running directly on the host machine
-    # If your Go app is running inside another container, you'd use the service name.
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -56,7 +62,7 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
     depends_on:
       - prometheus
-      - jaeger # Grafana can integrate with Jaeger for traces
+      - jaeger
 
   node-exporter:
     image: prom/node-exporter:latest
@@ -86,35 +92,57 @@ services:
     depends_on:
       - prometheus
 
-  jaeger: # New service for Jaeger
+  jaeger:
     image: jaegertracing/all-in-one:latest
     container_name: jaeger
     ports:
       - "16686:16686" # Jaeger UI
-      - "4317:4317"   # OTLP gRPC receiver
-      - "4318:4318"   # OTLP HTTP receiver (your Go app sends to this)
-      - "14268:14268" # Jaeger Thrift HTTP receiver (legacy, but often useful to expose)
+      - "4317:4317" # Jaeger gRPC receiver (correct for OTLP)
+      - "14268:14268" # Jaeger Thrift HTTP receiver
     environment:
-      - COLLECTOR_OTLP_ENABLED=true # Explicitly enable OTLP receiver (though often on by default in recent all-in-one)
-    
+      - COLLECTOR_OTLP_ENABLED=true
+      - JAEGER_DISABLED=false
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:14269/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.101.0 
+    container_name: otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      # Expose the ports the collector is listening on for OTLP
+      # - "4317:4317" # For gRPC from applications
+      - "4318:4318" # For HTTP from applications
+    depends_on:
+      jaeger:
+        condition: service_healthy
+
   fluentd:
     build: ./fluentd
     container_name: fluentd
     ports:
-    - "24224:24224"
-    - "24224:24224/udp"
+      - "24224:24224"
+      - "24224:24224/udp"
     volumes:
-    - ./fluentd/fluentd.conf:/fluentd/etc/fluent.conf
-    - ./fluentd/log:/fluentd/log
-    - ./fluentd/wait-for-es.sh:/wait-for-es.sh
+      - ./fluentd/fluentd.conf:/fluentd/etc/fluent.conf
+      - ./fluentd/log:/fluentd/log
+      - ./fluentd/wait-for-es.sh:/wait-for-es.sh
     entrypoint: ["/wait-for-es.sh"]
     environment:
-    - FLUENT_ELASTICSEARCH_HOST=elasticsearch
-    - FLUENT_ELASTICSEARCH_PORT=9200
+      - FLUENT_ELASTICSEARCH_HOST=elasticsearch
+      - FLUENT_ELASTICSEARCH_PORT=9200
     depends_on:
-     elasticsearch:
-       condition: service_healthy
-
+      elasticsearch:
+        condition: service_healthy
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
@@ -128,21 +156,23 @@ services:
     volumes:
       - esdata:/usr/share/elasticsearch/data
     healthcheck:
-     test: curl -s http://localhost:9200 || exit 1
-     interval: 10s
-     timeout: 5s
-     retries: 5
+      test: curl -s http://localhost:9200 || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   kibana:
     image: docker.elastic.co/kibana/kibana:8.13.4
+    container_name: kibana
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
     ports:
       - "5601:5601"
     depends_on:
-      - elasticsearch
+      elasticsearch:
+        condition: service_healthy
 
 volumes:
   esdata:
   pgdata:
-  grafana-storage: {}
+  grafana-storage:
