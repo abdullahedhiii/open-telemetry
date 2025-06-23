@@ -15,6 +15,21 @@ services:
       # - postgres
       - fluentd
       - otel-collector
+  
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:8000
+        - VITE_OTEL_COLLECTOR_URL=http://localhost:4318/v1/traces
+        - VITE_FRONTEND_SERVICE_NAME=frontend
+    container_name: frontend
+    ports:
+      - "6600:80"
+    depends_on:
+      - backend
+      - otel-collector
 
   prometheus:
     image: prom/prometheus:latest

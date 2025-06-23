@@ -224,3 +224,4 @@
 {"time":"2025-06-23T08:46:11.088002799Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
 {"time":"2025-06-23T08:48:47.963111898Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
 {"time":"2025-06-23T08:50:27.086753242Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T10:56:13.313180456Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
