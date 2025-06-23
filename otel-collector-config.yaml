@@ -6,17 +6,15 @@ receivers:
         endpoint: "0.0.0.0:4317"
       http:
         endpoint: "0.0.0.0:4318"
-        cors:
-          allowed_origins:
-            - "http://localhost:6600"
-            - "http://localhost:3000"
-            - "http://localhost:8000"
-          allowed_headers:
-            - "Content-Type"
-            - "traceparent"
-            - "tracestate"
-            - "baggage"
-            - "x-client-trace-id"
+
+extensions:
+  health_check:
+  cors:
+    allowed_origins:
+      - "http://localhost:*"
+      - "http://127.0.0.1:*"
+    allowed_headers:
+      - "*"
 
 processors:
   batch:
@@ -26,17 +24,14 @@ processors:
 
 exporters:
   otlp:
-    # This should be the OTLP gRPC endpoint of the Jaeger service.
-    # In your docker-compose, Jaeger is listening on 4317 for gRPC OTLP.
     endpoint: "jaeger:4317"
     tls:
       insecure: true
 
 service:
+  extensions: [health_check, cors]
   pipelines:
     traces:
       receivers: [otlp]
       processors: [batch]
       exporters: [otlp]
-
-  extensions: []

@@ -15,24 +15,22 @@ services:
       # - postgres
       - fluentd
       - otel-collector
-    # Make sure your backend code is configured to send OTLP traces to the otel-collector
-    # E.g., if using gRPC: OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-    # Or if using HTTP: OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
-
+  
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
         - VITE_API_URL=http://localhost:8000
+        - VITE_OTEL_COLLECTOR_URL=http://localhost:4318/v1/traces
+        - VITE_FRONTEND_SERVICE_NAME=frontend
+        - DEV="Development"
     container_name: frontend
     ports:
       - "6600:80"
     depends_on:
       - backend
       - otel-collector
-    # Similar to backend, configure your frontend to send OTLP traces to the otel-collector
-    # E.g., if using HTTP: OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
 
   prometheus:
     image: prom/prometheus:latest
@@ -97,8 +95,8 @@ services:
     container_name: jaeger
     ports:
       - "16686:16686" # Jaeger UI
-      - "4317:4317" # Jaeger gRPC receiver (correct for OTLP)
-      - "14268:14268" # Jaeger Thrift HTTP receiver
+      - "4317:4317" 
+      - "14268:14268"
     environment:
       - COLLECTOR_OTLP_ENABLED=true
       - JAEGER_DISABLED=false
@@ -119,9 +117,7 @@ services:
     volumes:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
     ports:
-      # Expose the ports the collector is listening on for OTLP
-      # - "4317:4317" # For gRPC from applications
-      - "4318:4318" # For HTTP from applications
+      - "4318:4318"
     depends_on:
       jaeger:
         condition: service_healthy

@@ -127,3 +127,100 @@
 {"time":"2025-06-22T13:54:50.917254914Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":3.7423172449999997,"error":null}
 {"time":"2025-06-22T13:54:51.830291224Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11863}
 {"time":"2025-06-22T13:54:51.831107492Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11863}
+{"time":"2025-06-23T05:02:21.952817748Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T05:32:57.122962942Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T05:35:05.737823258Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T05:36:58.471605732Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T05:38:42.328651271Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T06:03:52.524790861Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T06:06:15.937052109Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T06:08:11.679463131Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T06:11:32.998487955Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T06:12:25.489117074Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T06:12:30.622914288Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-23T06:12:34.623435232Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":3.996206167,"error":null}
+{"time":"2025-06-23T06:12:35.303272646Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11863}
+{"time":"2025-06-23T06:12:35.304769209Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11863}
+{"time":"2025-06-23T06:16:24.533357138Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T06:17:49.818024097Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T06:18:27.289368366Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-23T06:18:30.26012366Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":2.970104148,"error":null}
+{"time":"2025-06-23T06:18:31.293032321Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11863}
+{"time":"2025-06-23T06:18:31.294171797Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11863}
+{"time":"2025-06-23T06:19:29.909239494Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T06:19:38.25282856Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-23T06:19:41.711928173Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":3.458737271,"error":null}
+{"time":"2025-06-23T06:19:42.368424355Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11863}
+{"time":"2025-06-23T06:19:42.36953117Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11863}
+{"time":"2025-06-23T06:21:30.869100605Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T06:21:44.727621052Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-23T06:21:47.926031851Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":3.197974426,"error":null}
+{"time":"2025-06-23T06:21:58.363913739Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11863}
+{"time":"2025-06-23T06:21:58.365093571Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11863}
+{"time":"2025-06-23T06:24:48.225026735Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T06:27:23.797471279Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T06:27:28.856585287Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-23T06:27:31.991842623Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":3.134397211,"error":null}
+{"time":"2025-06-23T06:27:34.421794382Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11863}
+{"time":"2025-06-23T06:27:34.422969702Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11863}
+{"time":"2025-06-23T06:33:01.777465218Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T06:33:11.689629536Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-23T06:33:14.85968847Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":3.169450477,"error":null}
+{"time":"2025-06-23T06:33:24.76251123Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11863}
+{"time":"2025-06-23T06:33:24.763311309Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11863}
+{"time":"2025-06-23T06:37:06.167352455Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T06:37:19.123818641Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-23T06:37:22.14951678Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":3.025113936,"error":null}
+{"time":"2025-06-23T06:37:26.746309669Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11863}
+{"time":"2025-06-23T06:37:26.74943384Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11863}
+{"time":"2025-06-23T06:42:17.697240715Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T06:45:20.230985969Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T06:55:52.576130536Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T06:59:15.215862319Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T06:59:26.241404874Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-23T06:59:29.549201672Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":3.306690159,"error":null}
+{"time":"2025-06-23T06:59:31.200039084Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11863}
+{"time":"2025-06-23T06:59:31.202020849Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11863}
+{"time":"2025-06-23T06:59:35.179551345Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-23T06:59:37.514582889Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":2.334721208,"error":null}
+{"time":"2025-06-23T06:59:38.40135208Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11863}
+{"time":"2025-06-23T06:59:38.402275566Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11863}
+{"time":"2025-06-23T07:01:52.398649054Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T07:06:27.963605778Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T07:06:36.223874628Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-23T07:06:40.321097933Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":4.096444798,"error":null}
+{"time":"2025-06-23T07:06:41.588697279Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11863}
+{"time":"2025-06-23T07:06:41.589522288Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11863}
+{"time":"2025-06-23T07:14:14.418846092Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T07:17:00.469022226Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/crypto/symbols"}
+{"time":"2025-06-23T07:17:01.488251224Z","level":"INFO","msg":"External API call completed","url":"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h","duration_sec":1.016356568,"error_present":false}
+{"time":"2025-06-23T07:17:01.489585363Z","level":"INFO","msg":"Coingecko API call successful for crypto symbols","api_url":"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h","status_code":200}
+{"time":"2025-06-23T07:17:01.49044432Z","level":"INFO","msg":"Starting JSON decoding for crypto symbols response"}
+{"time":"2025-06-23T07:17:01.60000705Z","level":"INFO","msg":"JSON decoding complete for crypto symbols response"}
+{"time":"2025-06-23T07:17:01.600319364Z","level":"INFO","msg":"Processed crypto data","total_coins":100,"valid_symbols_extracted":100}
+{"time":"2025-06-23T07:17:01.601592243Z","level":"INFO","msg":"Crypto symbols retrieved and response sent","count":100}
+{"time":"2025-06-23T07:21:36.823868916Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T07:23:12.587864388Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T07:23:21.518315521Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-23T07:23:24.856668141Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":3.337818219,"error":null}
+{"time":"2025-06-23T07:23:25.527717923Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11863}
+{"time":"2025-06-23T07:23:25.532706254Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11863}
+{"time":"2025-06-23T07:33:47.897074908Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T07:35:26.53783991Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-23T07:35:29.890520964Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":3.349845901,"error":null}
+{"time":"2025-06-23T07:35:30.682172035Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11863}
+{"time":"2025-06-23T07:35:30.683304012Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11863}
+{"time":"2025-06-23T07:37:53.679481797Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T07:38:17.423423447Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-23T07:38:20.594271303Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":3.17038033,"error":null}
+{"time":"2025-06-23T07:38:21.276701208Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11863}
+{"time":"2025-06-23T07:38:21.278261024Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11863}
+{"time":"2025-06-23T07:48:36.53386769Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T07:53:08.280573198Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T07:54:30.827225507Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T07:56:38.043130131Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T08:02:32.405805508Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T08:43:24.167630097Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T08:46:11.088002799Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T08:48:47.963111898Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-23T08:50:27.086753242Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
