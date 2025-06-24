@@ -10,6 +10,15 @@ import { propagation } from '@opentelemetry/api';
 
 propagation.setGlobalPropagator(new W3CTraceContextPropagator());
 
+class PathAttributeSpanProcessor extends SimpleSpanProcessor {
+  onStart(span) {
+    if (span.name === 'documentLoad') {
+      span.setAttribute('document.path', window.location.pathname);
+      span.setAttribute('document.url', window.location.href);
+    }
+  }
+}
+
 const provider = new WebTracerProvider({
   resource: Resource.default().merge(new Resource({
     'service.name': 'stock-tracker-frontend',
@@ -20,7 +29,7 @@ const exporter = new OTLPTraceExporter({
   url: 'http://localhost:4318/v1/traces', //opentel collector endpoint localhost for web browser!
 });
 
-provider.addSpanProcessor(new SimpleSpanProcessor(exporter));
+provider.addSpanProcessor(new PathAttributeSpanProcessor(exporter));
 provider.register({
   contextManager: new ZoneContextManager(),
 });
