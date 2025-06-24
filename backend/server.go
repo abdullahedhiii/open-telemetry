@@ -34,7 +34,7 @@ func main() {
 	//note: this is for auto instrumentation of routes
 	// router.Use(otelmux.Middleware("stock-tracker"))
 
-	router.Use(OpenTelemetryMetricsMiddleware())
+	// router.Use(OpenTelemetryMetricsMiddleware())
 
 	if err := initDB(); err != nil {
 		log.Fatal("Failed to initialize database:", err)

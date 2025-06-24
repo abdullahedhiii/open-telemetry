@@ -6,16 +6,17 @@ receivers:
       http:
         endpoint: "0.0.0.0:4318"
         cors:
-          allowed_origins:
-            - "http://localhost:6600"
-            - "http://localhost:3000"
-            - "http://localhost:8000"
-          allowed_headers:
-            - "Content-Type"
-            - "traceparent"
-            - "tracestate"
-            - "baggage"
-            - "x-client-trace-id"
+          allowed_origins: ["http://localhost:6600", "http://localhost:3000", "http://localhost:8000"]
+          allowed_headers: ["Content-Type", "traceparent", "tracestate", "baggage", "x-client-trace-id"]
+
+  hostmetrics:
+    collection_interval: 10s
+    scrapers:
+      cpu:
+      memory:
+      disk:
+      filesystem:
+      network:
 
 processors:
   batch:
@@ -28,6 +29,10 @@ exporters:
     endpoint: "jaeger:4317"
     tls:
       insecure: true
+  logging:
+    loglevel: info 
+  prometheus:
+    endpoint: "0.0.0.0:9464"  
 
 service:
   pipelines:
@@ -36,4 +41,7 @@ service:
       processors: [batch]
       exporters: [otlp]
 
-  extensions: []
+    metrics:
+      receivers: [hostmetrics]
+      processors: [batch]
+      exporters: [prometheus, logging]  # Choose what you need

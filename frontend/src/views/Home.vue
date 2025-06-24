@@ -18,7 +18,7 @@ async function fetchSymbols() {
         headers['Content-Type'] = 'application/json'
         const apiUrl = import.meta.env.VITE_API_URL || ""
         span.setAttribute('api.url', apiUrl + '/crypto/symbols')
-
+        // span.setAttribute('Trace id', span.spanContext().traceId)
         const response = await fetch(`${apiUrl}/crypto/symbols`,{
             method : 'GET',
             headers : headers

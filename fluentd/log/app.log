@@ -370,3 +370,81 @@
 {"time":"2025-06-24T07:58:42.121036121Z","level":"INFO","msg":"JSON decoding complete for crypto symbols response"}
 {"time":"2025-06-24T07:58:42.122676958Z","level":"INFO","msg":"Processed crypto data","total_coins":100,"valid_symbols_extracted":100}
 {"time":"2025-06-24T07:58:42.123047254Z","level":"INFO","msg":"Crypto symbols retrieved and response sent","count":100}
+{"time":"2025-06-24T08:05:08.575672039Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-24T08:05:17.56805676Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/crypto/symbols"}
+{"time":"2025-06-24T08:05:19.421815319Z","level":"INFO","msg":"External API call completed","url":"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h","duration_sec":1.8533438819999999,"error_present":false}
+{"time":"2025-06-24T08:05:19.422802965Z","level":"INFO","msg":"Coingecko API call successful for crypto symbols","api_url":"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h","status_code":200}
+{"time":"2025-06-24T08:05:19.42344523Z","level":"INFO","msg":"Starting JSON decoding for crypto symbols response"}
+{"time":"2025-06-24T08:05:19.768195483Z","level":"INFO","msg":"JSON decoding complete for crypto symbols response"}
+{"time":"2025-06-24T08:05:19.768431018Z","level":"INFO","msg":"Processed crypto data","total_coins":100,"valid_symbols_extracted":100}
+{"time":"2025-06-24T08:05:19.768668887Z","level":"INFO","msg":"Crypto symbols retrieved and response sent","count":100}
+{"time":"2025-06-24T08:40:14.912377917Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/crypto/symbols"}
+{"time":"2025-06-24T08:40:15.934101678Z","level":"INFO","msg":"External API call completed","url":"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h","duration_sec":1.013624596,"error_present":false}
+{"time":"2025-06-24T08:40:15.936331254Z","level":"INFO","msg":"Coingecko API call successful for crypto symbols","api_url":"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h","status_code":200}
+{"time":"2025-06-24T08:40:15.937105184Z","level":"INFO","msg":"Starting JSON decoding for crypto symbols response"}
+{"time":"2025-06-24T08:40:16.051852252Z","level":"INFO","msg":"JSON decoding complete for crypto symbols response"}
+{"time":"2025-06-24T08:40:16.052132672Z","level":"INFO","msg":"Processed crypto data","total_coins":100,"valid_symbols_extracted":100}
+{"time":"2025-06-24T08:40:16.055145645Z","level":"INFO","msg":"Crypto symbols retrieved and response sent","count":100}
+{"time":"2025-06-24T08:44:16.599107073Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-24T08:45:34.847062446Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/crypto/symbols"}
+{"time":"2025-06-24T08:45:36.07026381Z","level":"INFO","msg":"External API call completed","url":"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h","duration_sec":1.222305861,"error_present":false}
+{"time":"2025-06-24T08:45:36.072277103Z","level":"INFO","msg":"Coingecko API call successful for crypto symbols","api_url":"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h","status_code":200}
+{"time":"2025-06-24T08:45:36.07257604Z","level":"INFO","msg":"Starting JSON decoding for crypto symbols response"}
+{"time":"2025-06-24T08:45:36.180387302Z","level":"INFO","msg":"JSON decoding complete for crypto symbols response"}
+{"time":"2025-06-24T08:45:36.180688308Z","level":"INFO","msg":"Processed crypto data","total_coins":100,"valid_symbols_extracted":100}
+{"time":"2025-06-24T08:45:36.181059661Z","level":"INFO","msg":"Crypto symbols retrieved and response sent","count":100}
+{"time":"2025-06-24T08:48:14.178922736Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-24T08:48:17.485183327Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":3.301011898,"error":null}
+{"time":"2025-06-24T08:48:18.153462599Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11869}
+{"time":"2025-06-24T08:48:18.155529038Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11869}
+{"time":"2025-06-24T08:56:30.072297945Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-24T08:56:39.706520553Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-24T08:56:44.739916071Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":5.031596305,"error":null}
+{"time":"2025-06-24T08:56:49.611388494Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-24T08:56:51.975851263Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11869}
+{"time":"2025-06-24T08:56:51.976760166Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11869}
+{"time":"2025-06-24T08:56:53.328504076Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":3.7163993189999998,"error":null}
+{"time":"2025-06-24T08:56:54.116001469Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11869}
+{"time":"2025-06-24T08:56:54.116841157Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11869}
+{"time":"2025-06-24T08:58:27.088872546Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-24T08:58:30.414010787Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":3.318772724,"error":null}
+{"time":"2025-06-24T08:58:31.098134846Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11869}
+{"time":"2025-06-24T08:58:31.099704191Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11869}
+{"time":"2025-06-24T08:58:43.58574379Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-24T08:58:48.829529095Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-24T08:58:51.383760997Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":2.553998183,"error":null}
+{"time":"2025-06-24T08:58:52.054350854Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11869}
+{"time":"2025-06-24T08:58:52.057397557Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11869}
+{"time":"2025-06-24T09:03:34.12794206Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-24T09:03:36.615014014Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":2.48647205,"error":null}
+{"time":"2025-06-24T09:03:37.322161033Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11869}
+{"time":"2025-06-24T09:03:37.323185425Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11869}
+{"time":"2025-06-24T10:00:11.65443694Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/crypto/symbols"}
+{"time":"2025-06-24T10:00:12.780636879Z","level":"INFO","msg":"External API call completed","url":"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h","duration_sec":1.11787284,"error_present":false}
+{"time":"2025-06-24T10:00:12.781713744Z","level":"INFO","msg":"Coingecko API call successful for crypto symbols","api_url":"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h","status_code":200}
+{"time":"2025-06-24T10:00:12.781956554Z","level":"INFO","msg":"Starting JSON decoding for crypto symbols response"}
+{"time":"2025-06-24T10:00:12.905624971Z","level":"INFO","msg":"JSON decoding complete for crypto symbols response"}
+{"time":"2025-06-24T10:00:12.907107149Z","level":"INFO","msg":"Processed crypto data","total_coins":100,"valid_symbols_extracted":100}
+{"time":"2025-06-24T10:00:12.910747404Z","level":"INFO","msg":"Crypto symbols retrieved and response sent","count":100}
+{"time":"2025-06-24T10:05:44.273907656Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-24T10:05:59.18934231Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/crypto/symbols"}
+{"time":"2025-06-24T10:06:00.583390756Z","level":"INFO","msg":"External API call completed","url":"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h","duration_sec":1.391847831,"error_present":false}
+{"time":"2025-06-24T10:06:00.583637989Z","level":"INFO","msg":"Coingecko API call successful for crypto symbols","api_url":"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h","status_code":200}
+{"time":"2025-06-24T10:06:00.583948176Z","level":"INFO","msg":"Starting JSON decoding for crypto symbols response"}
+{"time":"2025-06-24T10:06:00.72150499Z","level":"INFO","msg":"JSON decoding complete for crypto symbols response"}
+{"time":"2025-06-24T10:06:00.721760299Z","level":"INFO","msg":"Processed crypto data","total_coins":100,"valid_symbols_extracted":100}
+{"time":"2025-06-24T10:06:00.722155447Z","level":"INFO","msg":"Crypto symbols retrieved and response sent","count":100}
+{"time":"2025-06-24T10:06:04.40361906Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-24T10:06:08.084215656Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":3.679920643,"error":null}
+{"time":"2025-06-24T10:06:11.816665427Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11869}
+{"time":"2025-06-24T10:06:11.831654768Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11869}
+{"time":"2025-06-24T10:13:44.873595817Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-24T10:17:20.007802967Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-24T10:19:08.78638958Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-24T10:34:55.745492688Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-24T10:36:40.750989204Z","level":"INFO","msg":"Handler execution started","method":"GET","target":"/stocks/symbols"}
+{"time":"2025-06-24T10:36:43.967405499Z","level":"INFO","msg":"External API call made","url":"https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=26AMBY8WA3V0FCMD","duration_sec":3.214961217,"error":null}
+{"time":"2025-06-24T10:36:44.857875159Z","level":"INFO","msg":"CSV parsing complete","active_symbols_count":11869}
+{"time":"2025-06-24T10:36:44.858906481Z","level":"INFO","msg":"Stock symbols retrieved and response sent","count":11869}
+{"time":"2025-06-24T10:41:31.404173155Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}
+{"time":"2025-06-24T10:43:40.340292874Z","level":"INFO","msg":"Logger initialized","service":"otel-backend"}

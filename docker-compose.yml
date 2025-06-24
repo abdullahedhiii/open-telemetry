@@ -57,33 +57,25 @@ services:
       - prometheus
       - jaeger
 
-  node-exporter:
-    image: prom/node-exporter:latest
-    container_name: node-exporter
-    ports:
-      - "9100:9100"
-    volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/rootfs:ro
-    command:
-      - '--path.procfs=/host/proc'
-      - '--path.sysfs=/host/sys'
-      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
-
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
-    container_name: cadvisor
-    ports:
-      - "8080:8080"
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
-    depends_on:
-      - prometheus
+   image: gcr.io/cadvisor/cadvisor:v0.47.2
+   container_name: cadvisor
+   restart: unless-stopped
+   privileged: true
+   ports:
+    - "8080:8080"
+   volumes:
+    - /:/rootfs:ro
+    - /var/run:/var/run:ro
+    - /sys:/sys:ro
+    - /var/lib/docker/:/var/lib/docker:ro
+    - /var/run/docker.sock:/var/run/docker.sock:ro  
+    - /dev/disk/:/dev/disk:ro
+   command:
+    - "--docker_only=true"
+    - "--store_container_labels=true"
+    - "--raw_cgroup_prefix_whitelist=/docker/"
+    - "--whitelisted_container_labels=com.docker.compose.service"
 
   jaeger:
     image: jaegertracing/all-in-one:latest
@@ -114,6 +106,7 @@ services:
     ports:
       # - "4317:4317"
       - "4318:4318" 
+      - "9464:9464"
     depends_on:
       jaeger:
         condition: service_healthy
