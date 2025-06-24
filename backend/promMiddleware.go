@@ -1,78 +1,59 @@
 package main
 
 import (
+	"net/http"
 	"strconv"
 	"time"
 
-	"net/http"
-
 	"github.com/gorilla/mux"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 )
 
 var (
-	// HTTP request metrics
-	httpRequestsTotal = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "http_requests_total",
-			Help: "Total number of HTTP requests",
-		},
-		[]string{"method", "handler", "code"},
-	)
-
-	httpRequestDuration = promauto.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "http_request_duration_seconds",
-			Help:    "Duration of HTTP requests in seconds",
-			Buckets: prometheus.DefBuckets,
-		},
-		[]string{"method", "handler", "code"},
-	)
-
-	httpRequestSize = promauto.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "http_request_size_bytes",
-			Help:    "Size of HTTP requests in bytes",
-			Buckets: prometheus.ExponentialBuckets(100, 10, 8),
-		},
-		[]string{"method", "handler"},
-	)
-
-	httpResponseSize = promauto.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "http_response_size_bytes",
-			Help:    "Size of HTTP responses in bytes",
-			Buckets: prometheus.ExponentialBuckets(100, 10, 8),
-		},
-		[]string{"method", "handler", "code"},
-	)
-
-	// Business logic metrics
-	stockLookups = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "stock_lookups_total",
-			Help: "Total number of stock symbol lookups",
-		},
-		[]string{"symbol", "status"},
-	)
-
-	cryptoLookups = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "crypto_lookups_total",
-			Help: "Total number of crypto symbol lookups",
-		},
-		[]string{"symbol", "status"},
-	)
-
-	watchlistOperations = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "watchlist_operations_total",
-			Help: "Total number of watchlist operations",
-		},
-		[]string{"operation", "status"},
-	)
+	httpRequestCounter  metric.Int64Counter
+	httpRequestDuration metric.Float64Histogram
+	httpRequestSize     metric.Float64Histogram
+	httpResponseSize    metric.Float64Histogram
 )
+
+// InitHTTPMetrics initializes all HTTP metrics instruments
+func InitHTTPMetrics() error {
+	meter := otel.Meter("stock-tracker-service/http")
+
+	var err error
+
+	if httpRequestCounter, err = meter.Int64Counter(
+		"http_requests_total",
+		metric.WithDescription("Total number of HTTP requests"),
+	); err != nil {
+		return err
+	}
+
+	if httpRequestDuration, err = meter.Float64Histogram(
+		"http_request_duration_seconds",
+		metric.WithDescription("Duration of HTTP requests in seconds"),
+	); err != nil {
+		return err
+	}
+
+	if httpRequestSize, err = meter.Float64Histogram(
+		"http_request_size_bytes",
+		metric.WithDescription("Size of HTTP requests in bytes"),
+	); err != nil {
+		return err
+	}
+
+	if httpResponseSize, err = meter.Float64Histogram(
+		"http_response_size_bytes",
+		metric.WithDescription("Size of HTTP responses in bytes"),
+	); err != nil {
+		return err
+	}
+
+	return nil
+}
 
 // responseWriter wraps http.ResponseWriter to capture status code and response size
 type responseWriter struct {
@@ -92,61 +73,47 @@ func (rw *responseWriter) Write(b []byte) (int, error) {
 	return size, err
 }
 
-// PrometheusMiddleware creates HTTP metrics middleware
-func PrometheusMiddleware() mux.MiddlewareFunc {
+func OpenTelemetryMetricsMiddleware() mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
 
-			// Get route pattern for better labeling
-			route := mux.CurrentRoute(r)
+			// Capture route pattern
 			handler := "unknown"
-			if route != nil {
+			if route := mux.CurrentRoute(r); route != nil {
 				if pattern, err := route.GetPathTemplate(); err == nil {
 					handler = pattern
 				}
 			}
 
 			// Wrap response writer
-			rw := &responseWriter{
-				ResponseWriter: w,
-				statusCode:     200, // default status code
-			}
+			rw := &responseWriter{ResponseWriter: w, statusCode: 200}
 
 			// Process request
 			next.ServeHTTP(rw, r)
 
-			// Record metrics
+			// Collect metrics
 			duration := time.Since(start).Seconds()
 			statusCode := strconv.Itoa(rw.statusCode)
 			method := r.Method
+			ctx := r.Context()
 
-			// HTTP metrics
-			httpRequestsTotal.WithLabelValues(method, handler, statusCode).Inc()
-			httpRequestDuration.WithLabelValues(method, handler, statusCode).Observe(duration)
+			attrs := []attribute.KeyValue{
+				attribute.String("http.method", method),
+				attribute.String("http.route", handler),
+				attribute.String("http.status_code", statusCode),
+			}
+
+			httpRequestCounter.Add(ctx, 1, metric.WithAttributes(attrs...))
+			httpRequestDuration.Record(ctx, duration, metric.WithAttributes(attrs...))
 
 			if r.ContentLength > 0 {
-				httpRequestSize.WithLabelValues(method, handler).Observe(float64(r.ContentLength))
+				httpRequestSize.Record(ctx, float64(r.ContentLength), metric.WithAttributes(attrs...))
 			}
 
 			if rw.responseSize > 0 {
-				httpResponseSize.WithLabelValues(method, handler, statusCode).Observe(float64(rw.responseSize))
+				httpResponseSize.Record(ctx, float64(rw.responseSize), metric.WithAttributes(attrs...))
 			}
 		})
 	}
-}
-
-// RecordStockLookup records a stock lookup metric
-func RecordStockLookup(symbol, status string) {
-	stockLookups.WithLabelValues(symbol, status).Inc()
-}
-
-// RecordCryptoLookup records a crypto lookup metric
-func RecordCryptoLookup(symbol, status string) {
-	cryptoLookups.WithLabelValues(symbol, status).Inc()
-}
-
-// RecordWatchlistOperation records a watchlist operation metric
-func RecordWatchlistOperation(operation, status string) {
-	watchlistOperations.WithLabelValues(operation, status).Inc()
 }
