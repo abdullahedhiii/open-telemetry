@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 ENV CYPRESS_INSTALL_BINARY=0
+ENV VITE_API_URL=http://localhost:8000
 
 COPY package*.json ./
 RUN npm install

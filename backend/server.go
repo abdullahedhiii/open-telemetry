@@ -31,7 +31,7 @@ func main() {
 	}
 	fmt.Println("Runtime metrics started")
 
-	//this is for auto instrumentation of routes
+	//note: this is for auto instrumentation of routes
 	// router.Use(otelmux.Middleware("stock-tracker"))
 
 	router.Use(PrometheusMiddleware())

@@ -1,0 +1,41 @@
+<script setup>
+import { tracer } from '../tracing.js'
+import { ref } from 'vue'
+
+const symbols = ref(null)
+const error = ref(null)
+
+async function fetchSymbols() {
+    error.value = null
+    symbols.value = null
+    const span = tracer.startSpan('fetchSymbols')
+    try {
+        const apiUrl = import.meta.env.VITE_API_URL || ""
+        span.setAttribute('api.url', apiUrl + '/crypto/symbols')
+        const response = await fetch(`${apiUrl}/crypto/symbols`)
+        span.setAttribute('http.status_code', response.status)
+        if (!response.ok) throw new Error("Network response was not ok")
+        const data = await response.json()
+        symbols.value = JSON.stringify(data, null, 2)
+        span.setStatus({ code: 1 }) 
+    } catch (err) {
+        error.value = err.message
+        span.setStatus({ code: 2, message: err.message }) 
+    } finally {
+        span.end()
+    }
+}
+</script>
+
+<template>
+    <div>
+        <button @click="fetchSymbols">Fetch Crypto Symbols</button>
+        <div v-if="symbols">
+            <h3>Response:</h3>
+            <pre>{{ symbols }}</pre>
+        </div>
+        <div v-if="error" style="color: red;">
+            Error: {{ error }}
+        </div>
+    </div>
+</template>

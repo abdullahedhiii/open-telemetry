@@ -218,7 +218,6 @@ func getStockData(w http.ResponseWriter, r *http.Request) {
 
 		apiCallSpan.SetStatus(codes.Error, errorMsg)
 		span.SetStatus(codes.Error, errorMsg)
-		// Log error for non-OK status
 		Logger.ErrorContext(ctx, "AlphaVantage returned non-OK status for stock data",
 			"status_code", response.StatusCode,
 			"response_body", string(bodyBytes),
