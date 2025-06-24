@@ -17,6 +17,8 @@ receivers:
       disk:
       filesystem:
       network:
+      load:
+      process:
 
 processors:
   batch:
@@ -44,4 +46,4 @@ service:
     metrics:
       receivers: [hostmetrics]
       processors: [batch]
-      exporters: [prometheus, logging]  # Choose what you need
+      exporters: [prometheus]  
