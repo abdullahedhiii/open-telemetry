@@ -5,6 +5,10 @@ import { registerInstrumentations } from '@opentelemetry/instrumentation';
 import { getWebAutoInstrumentations } from '@opentelemetry/auto-instrumentations-web';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import {Resource} from '@opentelemetry/resources';
+import { W3CTraceContextPropagator } from '@opentelemetry/core';
+import { propagation } from '@opentelemetry/api';
+
+propagation.setGlobalPropagator(new W3CTraceContextPropagator());
 
 const provider = new WebTracerProvider({
   resource: Resource.default().merge(new Resource({
@@ -13,7 +17,7 @@ const provider = new WebTracerProvider({
 });
 
 const exporter = new OTLPTraceExporter({
-  url: 'http://localhost:4318/v1/traces',
+  url: 'http://localhost:4318/v1/traces', //opentel collector endpoint localhost for web browser!
 });
 
 provider.addSpanProcessor(new SimpleSpanProcessor(exporter));

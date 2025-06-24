@@ -15,15 +15,16 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/propagation"
 	_ "go.opentelemetry.io/otel/trace"
 )
 
 const apiKey = "26AMBY8WA3V0FCMD"
 
 func getAllStockSymbols(w http.ResponseWriter, r *http.Request) {
-
+	ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
 	tracer := otel.Tracer("stock-tracker-app-tracer")
-	ctx, span := tracer.Start(r.Context(), "getAllStockSymbolsHandler")
+	ctx, span := tracer.Start(ctx, "getAllStockSymbolsHandler")
 	defer span.End()
 
 	r = r.WithContext(ctx)
@@ -82,8 +83,7 @@ func getAllStockSymbols(w http.ResponseWriter, r *http.Request) {
 		attribute.String("http.response_content_type", response.Header.Get("Content-Type")),
 	)
 	if response.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(response.Body)                          // Read body for error context
-		response.Body = io.NopCloser(strings.NewReader(string(bodyBytes))) // Restore body for later
+		bodyBytes, _ := io.ReadAll(response.Body)
 		errorMsg := fmt.Sprintf("API returned non-OK status: %d, body: %s", response.StatusCode, bodyBytes)
 
 		apiCallSpan.SetStatus(codes.Error, errorMsg)
@@ -268,9 +268,9 @@ type coinData struct {
 }
 
 func getAllCryptoSymbols(w http.ResponseWriter, r *http.Request) {
-
+	ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
 	tracer := otel.Tracer("stock-tracker-app-tracer")
-	ctx, span := tracer.Start(r.Context(), "getAllCryptoSymbolsHandler")
+	ctx, span := tracer.Start(ctx, "getAllCryptoSymbolsHandler")
 	defer span.End()
 
 	r = r.WithContext(ctx)

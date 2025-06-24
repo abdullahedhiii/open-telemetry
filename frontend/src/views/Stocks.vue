@@ -17,9 +17,9 @@ async function fetchSymbols() {
         propagation.inject(ctx, headers)
         headers['Content-Type'] = 'application/json'
         const apiUrl = import.meta.env.VITE_API_URL || ""
-        span.setAttribute('api.url', apiUrl + '/crypto/symbols')
+        span.setAttribute('api.url', apiUrl + '/stocks/symbols')
 
-        const response = await fetch(`${apiUrl}/crypto/symbols`,{
+        const response = await fetch(`${apiUrl}/stocks/symbols`,{
             method : 'GET',
             headers : headers
         })
