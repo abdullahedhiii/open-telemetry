@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluentd-config
+  namespace: default
+data:
+  fluent.conf: |
+    <source>
+      @type tail
+      path /fluentd/log/app.log
+      pos_file /fluentd/log/app.pos
+      tag app.log
+      <parse>
+        @type json
+        time_key time
+        time_format %Y-%m-%dT%H:%M:%S.%NZ
+      </parse>
+    </source>
+
+    <filter app.log>
+      @type record_transformer
+      enable_ruby true
+       <record>
+        hostname "#{Socket.gethostname}"
+       </record>
+    </filter>
+
+    <match app.log>
+      @type elasticsearch
+        host "#{ENV['FLUENT_ELASTICSEARCH_HOST'] || 'elasticsearch'}"
+        port "#{ENV['FLUENT_ELASTICSEARCH_PORT'] || 9200}"
+        logstash_format true
+        include_tag_key true
+        tag_key @log_name
+    </match>
+
+  wait-for-es.sh: |
+    #!/bin/sh
+    sleep 5
+    echo "Waiting for Elasticsearch to be ready..."
+    until curl -s http://elasticsearch:9200 >/dev/null; do
+      echo "Still waiting for Elasticsearch..."
+      sleep 2
+    done
+    echo "Elasticsearch is up. Starting Fluentd..."
+    exec fluentd -c /fluentd/etc/fluent.conf -v
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fluentd
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fluentd
+  template:
+    metadata:
+      labels:
+        app: fluentd
+    spec:
+      containers:
+        - name: fluentd
+          image: fluent/fluentd:v1.16-debian
+          command: ["/bin/sh", "-c", "/wait-for-es.sh"]
+          ports:
+            - containerPort: 24224
+            - containerPort: 24224
+              protocol: UDP
+          volumeMounts:
+            - name: config
+              mountPath: /fluentd/etc/
+            - name: script
+              mountPath: /wait-for-es.sh
+              subPath: wait-for-es.sh
+            - name: log
+              mountPath: /fluentd/log
+          env:
+            - name: FLUENT_ELASTICSEARCH_HOST
+              value: "elasticsearch"
+            - name: FLUENT_ELASTICSEARCH_PORT
+              value: "9200"
+      volumes:
+        - name: config
+          configMap:
+            name: fluentd-config
+            items:
+              - key: fluent.conf
+                path: fluent.conf
+        - name: script
+          configMap:
+            name: fluentd-config
+            defaultMode: 0775
+        - name: log
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fluentd-service
+spec:
+  selector:
+    app: fluentd
+  ports:
+    - port: 24224
+      targetPort: 24224
