@@ -1,4 +1,4 @@
-apiVersion: apps/v1
+apiVersion:  apps/v1
 kind: Deployment
 metadata:
   name: cadvisor
@@ -14,6 +14,7 @@ spec:
       labels:
         app: cadvisor
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: cadvisor
           image: gcr.io/cadvisor/cadvisor:v0.47.2

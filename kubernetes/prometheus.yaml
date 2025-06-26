@@ -18,17 +18,17 @@ data:
         scheme: 'http'
         scrape_interval: 5s
 
-      - job_name: 'prometheus'
-        static_configs:
-          - targets: ['localhost:9090']
+      # - job_name: 'prometheus'
+      #   static_configs:
+      #     - targets: ['localhost:9090']
 
       - job_name: 'otel-collector-system-metrics'
         static_configs:
-          - targets: ['otel-collector:9464']
+          - targets: ['otel-collector-service:9464']
 
       - job_name: 'cadvisor'
         static_configs:
-          - targets: ['cadvisor:8080']
+          - targets: ['cadvisor-service:8080']
 ---
 apiVersion: apps/v1
 kind: Deployment
