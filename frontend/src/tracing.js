@@ -26,7 +26,8 @@ const provider = new WebTracerProvider({
 });
 
 const exporter = new OTLPTraceExporter({
-  url: 'http://localhost:4318/v1/traces', //opentel collector endpoint localhost for web browser!
+  // url: 'http://localhost:4318/v1/traces', //opentel collector endpoint localhost for web browser!
+  url : "http://otel-collector.127.0.0.1.sslip.io/v1/traces"
 });
 
 provider.addSpanProcessor(new PathAttributeSpanProcessor(exporter));

@@ -78,3 +78,13 @@ spec:
                 name: prometheus-service
                 port:
                   number: 9090
+    - host: otel-collector.127.0.0.1.sslip.io
+      http:
+        paths:
+          - path: /v1/traces
+            pathType: Prefix
+            backend:
+              service:
+                name: otel-collector-service
+                port:
+                  number: 4318

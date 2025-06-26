@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: abdullahedhii/opentel-demo-project:backend-image
+          image: abdullahedhii/opentel-demo-project:backend-image-v1.1.1
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
