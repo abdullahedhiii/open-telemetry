@@ -25,7 +25,7 @@ data:
           filesystem:
           network:
           load:
-          process:
+          # process:
 
     processors:
       batch:
@@ -35,7 +35,7 @@ data:
 
     exporters:
       otlp:
-        endpoint: "jaeger:4317"
+        endpoint: "jaeger-service:4317"
         tls:
           insecure: true
       logging:
@@ -48,7 +48,7 @@ data:
         traces:
           receivers: [otlp]
           processors: [batch]
-          exporters: [otlp]
+          exporters: [otlp,logging]
 
         metrics:
           receivers: [hostmetrics]

@@ -64,9 +64,9 @@ func initTelemetry() (func(), error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
-
+	//http://otel-collector.127.0.0.1.sslip.io/v1/traces
 	traceExporter, err := otlptracehttp.New(ctx,
-		otlptracehttp.WithEndpoint("otel-collector:4318"), //opentel collector
+		otlptracehttp.WithEndpoint("otel-collector-service:4318"),
 		otlptracehttp.WithInsecure(),
 		otlptracehttp.WithURLPath("/v1/traces"),
 	)

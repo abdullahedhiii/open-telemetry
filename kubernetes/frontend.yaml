@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: abdullahedhii/opentel-demo-project:frontend-image-v1.1.5
+          image: abdullahedhii/opentel-demo-project:frontend-image
           imagePullPolicy: Always
           ports:
             - containerPort: 80

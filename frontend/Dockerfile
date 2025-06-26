@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 ENV CYPRESS_INSTALL_BINARY=0
-ENV VITE_API_URL=http://backend.127.0.0.1.sslip.io:8000
+ENV VITE_API_URL=http://backend.127.0.0.1.sslip.io
 
 COPY package*.json ./
 RUN npm install
