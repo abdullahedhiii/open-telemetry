@@ -15,6 +15,7 @@ spec:
       containers:
         - name: backend
           image: abdullahedhii/opentel-demo-project:backend-image
+          imagePullPolicy: Always
           ports:
             - containerPort: 8000
             - containerPort: 2222

@@ -18,8 +18,16 @@ spec:
           ports:
             - containerPort: 5601
           env:
-            - name: ELASTICSEARCH_HOSTS
-              value: http://elasticsearch:9200
+           - name: ELASTICSEARCH_HOSTS
+             value: http://elasticsearch:9200
+           - name: ELASTICSEARCH_USERNAME
+             value: ""
+           - name: ELASTICSEARCH_PASSWORD
+             value: ""
+           - name: xpack.security.enabled
+             value: "false"
+
+             
 ---
 apiVersion: v1
 kind: Service
