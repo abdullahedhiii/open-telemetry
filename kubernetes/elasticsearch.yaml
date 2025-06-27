@@ -4,37 +4,26 @@ metadata:
   name: elasticsearch-config
   namespace: default
   labels:
-    app: elasticsearch # Add app label for easier selection
+    app: elasticsearch 
 data:
   elasticsearch.yml: |
-    # Cluster Configuration
     cluster.name: Demo-Elastic
-    node.name: ${HOSTNAME} # Uses pod hostname for node name
-    discovery.type: single-node # Crucial for a single-node setup
+    node.name: ${HOSTNAME} 
+    discovery.type: single-node 
 
-    # Network Configuration
-    network.host: 0.0.0.0 # Binds to all network interfaces for HTTP and Transport
-    http.port: 9200       # HTTP client access
-    transport.port: 9300  # Node-to-node communication, default is 9300
+    network.host: 0.0.0.0 
+    http.port: 9200       
+    transport.port: 9300  
 
-    # X-Pack Security Configuration (Crucial for disabling it)
     xpack.security.enabled: false
-    xpack.security.http.ssl:
-      enabled: false
-    xpack.security.transport.ssl:
-      enabled: false
+    xpack.security.http.ssl.enabled: false
+    xpack.security.transport.ssl.enabled: false
 
-    # Disable other X-Pack features if not needed to reduce overhead
     xpack.graph.enabled: false
     xpack.watcher.enabled: false
     xpack.ml.enabled: false
-    # xpack.monitoring.enabled: false # Ensure this line is REMOVED if it was causing issues
-
-    # Bootstrap settings (often disabled for local development if causing issues)
-    # bootstrap.memory_lock: false # Recommended to keep false for Minikube unless mlockall is configured
-
-    # Logging (default is fine, but can be customized)
-    # log4j2.yml: | # Example for custom logging config, if needed
+    
+    xpack.security.authc.api_key.enabled: false 
 
 ---
 apiVersion: apps/v1
@@ -54,7 +43,7 @@ spec:
     spec:
       containers:
         - name: elasticsearch
-          image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4 # Use the exact version
+          image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4 
           ports:
             - containerPort: 9200
               name: http
@@ -62,26 +51,26 @@ spec:
               name: transport
           env:
             - name: ES_JAVA_OPTS
-              value: -Xms1g -Xmx1g # Allocate 1GB heap
+              value: -Xms1g -Xmx1g 
           resources:
             limits:
-              memory: "2Gi" # Container memory limit (at least ES_JAVA_OPTS + overhead)
-              cpu: "1000m"  # 1 CPU core
+              memory: "2Gi" 
+              cpu: "1000m"  
             requests:
               memory: "1Gi"
               cpu: "500m"
           volumeMounts:
             - name: config-volume
-              mountPath: /usr/share/elasticsearch/config/elasticsearch.yml # Mount the config file
-              subPath: elasticsearch.yml # Specify subPath for single file mount
+              mountPath: /usr/share/elasticsearch/config/elasticsearch.yml 
+              subPath: elasticsearch.yml 
             - name: esdata
-              mountPath: /usr/share/elasticsearch/data # Mount data directory
+              mountPath: /usr/share/elasticsearch/data 
       volumes:
         - name: config-volume
           configMap:
-            name: elasticsearch-config # Reference the ConfigMap
-        - name: esdata # Data volume
-          emptyDir: {} # Use emptyDir for ephemeral data in Minikube. For persistence, use a PVC.
+            name: elasticsearch-config 
+        - name: esdata 
+          emptyDir: {} 
 
 ---
 apiVersion: v1
@@ -90,17 +79,17 @@ metadata:
   name: elasticsearch-service
   namespace: default
   labels:
-    app: elasticsearch # Add app label for consistency
+    app: elasticsearch 
 spec:
   selector:
-    app: elasticsearch # Selects pods with app: elasticsearch label
+    app: elasticsearch 
   ports:
     - protocol: TCP
-      name: http # HTTP port for clients (Kibana, curl)
+      name: http 
       port: 9200
       targetPort: 9200
     - protocol: TCP
-      name: transport # Transport port for inter-node communication (if scaling up)
+      name: transport 
       port: 9300
       targetPort: 9300
-  type: ClusterIP # Internal cluster access
+  type: ClusterIP 
