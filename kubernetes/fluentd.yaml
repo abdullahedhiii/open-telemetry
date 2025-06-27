@@ -38,7 +38,7 @@ data:
     #!/bin/sh
     sleep 5
     echo "Waiting for Elasticsearch to be ready..."
-    until curl -s http://elasticsearch:9200 >/dev/null; do
+    until curl -s http://elasticsearch-service:9200 >/dev/null; do
       echo "Still waiting for Elasticsearch..."
       sleep 2
     done

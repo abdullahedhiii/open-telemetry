@@ -1,7 +1,40 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kibana-config
+  namespace: default
+  labels:
+    app: kibana # Add app label for consistency
+data:
+  kibana.yml: |
+    # Server configuration
+    server.host: "0.0.0.0" # Binds to all network interfaces
+    server.port: 5601
+
+    # Elasticsearch connection configuration
+    # Point to the Kubernetes Service name for Elasticsearch
+    elasticsearch.hosts: ["http://elasticsearch-service:9200"] 
+
+    # Crucial: Disable X-Pack Security configuration for Kibana
+    # This prevents Kibana from attempting to set up security or ask for tokens/credentials
+    # xpack.security.enabled: false
+    xpack.fleet.enabled: false 
+    xpack.apm.enabled: false
+    # xpack.graph.enabled: false
+    # xpack.maps.enabled: false
+    xpack.monitoring.enabled: false
+    xpack.reporting.enabled: false
+    # Remove any username/password/token configurations if you are running ES insecurely
+    # elasticsearch.username: "kibana_system" # REMOVED
+    # elasticsearch.password: "your_password" # REMOVED
+    # elasticsearch.serviceAccountToken: # REMOVED
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kibana
+  namespace: default
 spec:
   replicas: 1
   selector:
@@ -14,28 +47,50 @@ spec:
     spec:
       containers:
         - name: kibana
-          image: docker.elastic.co/kibana/kibana:8.13.4
+          image: docker.elastic.co/kibana/kibana:8.13.4 # Use the exact version matching ES
           ports:
             - containerPort: 5601
           env:
-           - name: ELASTICSEARCH_HOSTS
-             value: http://elasticsearch:9200
-           - name: ELASTICSEARCH_USERNAME
-             value: ""
-           - name: ELASTICSEARCH_PASSWORD
-             value: ""
-           - name: xpack.security.enabled
-             value: "false"
+            # IMPORTANT: Set ELASTICSEARCH_HOSTS here to ensure it takes precedence
+            # and explicitly points to the service.
+            # Using the Service Name directly is usually best for in-cluster communication.
+            - name: ELASTICSEARCH_HOSTS
+              value: http://elasticsearch-service:9200
+            # Remove ELASTICSEARCH_USERNAME and ELASTICSEARCH_PASSWORD to avoid auth prompts
+            # - name: ELASTICSEARCH_USERNAME # REMOVED
+            #   value: "" # REMOVED
+            # - name: ELASTICSEARCH_PASSWORD # REMOVED
+            #   value: "" # REMOVED
+          resources: # Good practice to add resources for Kibana too
+            limits:
+              memory: "1Gi" # Adjust based on your usage and Minikube memory
+              cpu: "1000m"
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+          volumeMounts: # Crucial: Mount the ConfigMap containing kibana.yml
+            - name: config-volume
+              mountPath: /usr/share/kibana/config/kibana.yml # Standard path for kibana.yml
+              subPath: kibana.yml # Mount the specific file from the ConfigMap
+      volumes: # Define the volume that sources from the ConfigMap
+        - name: config-volume
+          configMap:
+            name: kibana-config # Refers to the ConfigMap defined above
 
-             
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: kibana-service
+  namespace: default
+  labels:
+    app: kibana # Add app label for consistency
 spec:
   selector:
-    app: kibana
+    app: kibana # Selects pods with app: kibana label
   ports:
-    - port: 5601
-      targetPort: 5601
+    - protocol: TCP
+      name: http # Standard name for HTTP service
+      port: 5601 # Service port
+      targetPort: 5601 # Container port
+  type: ClusterIP # Internal cluster access

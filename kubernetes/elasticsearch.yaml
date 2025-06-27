@@ -1,7 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elasticsearch-config
+  namespace: default
+  labels:
+    app: elasticsearch # Add app label for easier selection
+data:
+  elasticsearch.yml: |
+    # Cluster Configuration
+    cluster.name: Demo-Elastic
+    node.name: ${HOSTNAME} # Uses pod hostname for node name
+    discovery.type: single-node # Crucial for a single-node setup
+
+    # Network Configuration
+    network.host: 0.0.0.0 # Binds to all network interfaces for HTTP and Transport
+    http.port: 9200       # HTTP client access
+    transport.port: 9300  # Node-to-node communication, default is 9300
+
+    # X-Pack Security Configuration (Crucial for disabling it)
+    xpack.security.enabled: false
+    xpack.security.http.ssl:
+      enabled: false
+    xpack.security.transport.ssl:
+      enabled: false
+
+    # Disable other X-Pack features if not needed to reduce overhead
+    xpack.graph.enabled: false
+    xpack.watcher.enabled: false
+    xpack.ml.enabled: false
+    # xpack.monitoring.enabled: false # Ensure this line is REMOVED if it was causing issues
+
+    # Bootstrap settings (often disabled for local development if causing issues)
+    # bootstrap.memory_lock: false # Recommended to keep false for Minikube unless mlockall is configured
+
+    # Logging (default is fine, but can be customized)
+    # log4j2.yml: | # Example for custom logging config, if needed
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: elasticsearch
+  namespace: default
 spec:
   replicas: 1
   selector:
@@ -14,31 +54,53 @@ spec:
     spec:
       containers:
         - name: elasticsearch
-          image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+          image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4 # Use the exact version
           ports:
             - containerPort: 9200
+              name: http
+            - containerPort: 9300
+              name: transport
           env:
-            - name: discovery.type
-              value: single-node
             - name: ES_JAVA_OPTS
-              value: -Xms512m -Xmx512m
-            - name: xpack.security.enabled
-              value: "false"
+              value: -Xms1g -Xmx1g # Allocate 1GB heap
+          resources:
+            limits:
+              memory: "2Gi" # Container memory limit (at least ES_JAVA_OPTS + overhead)
+              cpu: "1000m"  # 1 CPU core
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
           volumeMounts:
+            - name: config-volume
+              mountPath: /usr/share/elasticsearch/config/elasticsearch.yml # Mount the config file
+              subPath: elasticsearch.yml # Specify subPath for single file mount
             - name: esdata
-              mountPath: /usr/share/elasticsearch/data
+              mountPath: /usr/share/elasticsearch/data # Mount data directory
       volumes:
-        - name: esdata
-          emptyDir: {}
+        - name: config-volume
+          configMap:
+            name: elasticsearch-config # Reference the ConfigMap
+        - name: esdata # Data volume
+          emptyDir: {} # Use emptyDir for ephemeral data in Minikube. For persistence, use a PVC.
+
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: elasticsearch-service
+  namespace: default
+  labels:
+    app: elasticsearch # Add app label for consistency
 spec:
   selector:
-    app: elasticsearch
+    app: elasticsearch # Selects pods with app: elasticsearch label
   ports:
-    - port: 9200
+    - protocol: TCP
+      name: http # HTTP port for clients (Kibana, curl)
+      port: 9200
       targetPort: 9200
-
+    - protocol: TCP
+      name: transport # Transport port for inter-node communication (if scaling up)
+      port: 9300
+      targetPort: 9300
+  type: ClusterIP # Internal cluster access
