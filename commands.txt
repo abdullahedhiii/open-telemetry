@@ -7,8 +7,20 @@ curl --cacert http_ca.crt --capath /usr/share/elasticsearch/config/certs https:/
 cd certs /cd config (Certtificate)
 pbpaste | base64 -d
 ./elasticsearch-service-tokens create elastic/kibana kibana-token
-SERVICE_TOKEN elastic/kibana/kibana-token = AAEAAWVsYXN0aWMva2liYW5hL2tpYmFuYS10b2tlbjp6ZVVNdkV6bFRQU2JXU0p2UWVNb0ln
-curl -k -u abdullah:edhi https://localhost:9200
+SERVICE_TOKEN elastic/kibana/kibana-token = AAEAAWVsYXN0aWMva2liYW5hL2tpYmFuYS10b2tlbjpoTUZPSDFLbVI3U1pOaFBULURoVU13
+curl -k -u elastic:ntOiTqlSqALrwVyF601+ https://localhost:9200
 
-elastic user password:
-# ntOiTqlSqALrwVyF601+
+# ntOiTqlSqALrwVyF601+ß
+
+kubectl create secret generic es-ca-cert --from-file=http_ca.crt=./cert.crt 
+
+minikube start --driver=docker --memory=4096mb --cpus=2 --kubernetes-version=v1.27.12 --embed-certs
+
+
+
+minikube cp ingress-nginx-controller.tar /tmp/ingress-nginx-controller.tar
+minikube cp kube-webhook-certgen.tar /tmp/kube-webhook-certgen.tar
+minikube ssh 
+sudo docker load -i /tmp/ingress-nginx-controller.tar
+sudo docker load -i /tmp/kube-webhook-certgen.tar
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.12.2/deploy/static/provider/cloud/deploy.yaml

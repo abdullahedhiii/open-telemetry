@@ -20,30 +20,52 @@ data:
     <filter app.log>
       @type record_transformer
       enable_ruby true
-       <record>
+      <record>
         hostname "#{Socket.gethostname}"
-       </record>
+      </record>
     </filter>
 
     <match app.log>
       @type elasticsearch
-        host "#{ENV['FLUENT_ELASTICSEARCH_HOST'] || 'elasticsearch'}"
-        port "#{ENV['FLUENT_ELASTICSEARCH_PORT'] || 9200}"
-        logstash_format true
-        include_tag_key true
-        tag_key @log_name
+      host elasticsearch-service
+      port 9200
+      logstash_format true
+      include_tag_key true
+      tag_key @log_name
+      scheme https
+      user abdullah
+      password edhi12
+      ssl_verify false
     </match>
 
   wait-for-es.sh: |
-    #!/bin/sh
-    sleep 5
-    echo "Waiting for Elasticsearch to be ready..."
-    until curl -s http://elasticsearch-service:9200 >/dev/null; do
-      echo "Still waiting for Elasticsearch..."
+    #!/usr/bin/env ruby
+    require 'net/http'
+    require 'uri'
+    require 'openssl'
+
+    uri = URI.parse("https://elasticsearch-service:9200")
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+    http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+
+    request = Net::HTTP::Get.new(uri.request_uri)
+    request.basic_auth('abdullah', 'edhi12')
+
+    puts "Waiting for Elasticsearch to be ready..."
+
+    until begin
+      response = http.request(request)
+      response.code == "200"
+    rescue
+      false
+    end
+      puts "Still waiting for Elasticsearch..."
       sleep 2
-    done
-    echo "Elasticsearch is up. Starting Fluentd..."
-    exec fluentd -c /fluentd/etc/fluent.conf -v
+    end
+
+    puts "Elasticsearch is up. Starting Fluentd..."
+    exec "fluentd -c /fluentd/etc/fluent.conf -v"
 
 ---
 apiVersion: apps/v1
@@ -62,7 +84,7 @@ spec:
     spec:
       containers:
         - name: fluentd
-          image: fluent/fluentd:v1.16-debian
+          image: fluent/fluentd-kubernetes-daemonset:v1-debian-elasticsearch
           command: ["/bin/sh", "-c", "/wait-for-es.sh"]
           ports:
             - containerPort: 24224
@@ -74,11 +96,11 @@ spec:
             - name: script
               mountPath: /wait-for-es.sh
               subPath: wait-for-es.sh
-            - name: log
+            - name: shared-log
               mountPath: /fluentd/log
           env:
             - name: FLUENT_ELASTICSEARCH_HOST
-              value: "elasticsearch"
+              value: "elasticsearch-service"
             - name: FLUENT_ELASTICSEARCH_PORT
               value: "9200"
       volumes:
@@ -92,8 +114,13 @@ spec:
           configMap:
             name: fluentd-config
             defaultMode: 0775
-        - name: log
-          emptyDir: {}
+            items:
+              - key: wait-for-es.sh
+                path: wait-for-es.sh
+        - name: shared-log
+          persistentVolumeClaim:
+            claimName: shared-logs-pvc
+
 ---
 apiVersion: v1
 kind: Service
