@@ -9,16 +9,16 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: elasticsearch.127.0.0.1.sslip.io
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: elasticsearch-service
-                port:
-                  number: 9200
+    # - host: elasticsearch.127.0.0.1.sslip.io
+    #   http:
+    #     paths:
+    #       - path: /
+    #         pathType: Prefix
+    #         backend:
+    #           service:
+    #             name: elasticsearch-service
+    #             port:
+    #               number: 9200
     - host: grafana.127.0.0.1.sslip.io
       http:
         paths:
