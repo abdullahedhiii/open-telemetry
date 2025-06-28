@@ -1,0 +1,14 @@
+
+exec elasticpod -it -- bash
+cd bin 
+./elasticsearch-reset-password -u elastic -i -b -f
+./elasticsearch-users useradd abdullah -p edhi -r superuser
+curl --cacert http_ca.crt --capath /usr/share/elasticsearch/config/certs https://localhost:9200
+cd certs /cd config (Certtificate)
+pbpaste | base64 -d
+./elasticsearch-service-tokens create elastic/kibana kibana-token
+SERVICE_TOKEN elastic/kibana/kibana-token = AAEAAWVsYXN0aWMva2liYW5hL2tpYmFuYS10b2tlbjp6ZVVNdkV6bFRQU2JXU0p2UWVNb0ln
+curl -k -u abdullah:edhi https://localhost:9200
+
+elastic user password:
+# ntOiTqlSqALrwVyF601+

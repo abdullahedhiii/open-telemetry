@@ -15,15 +15,15 @@ data:
     http.port: 9200       
     transport.port: 9300  
 
-    xpack.security.enabled: false
+    xpack.security.enabled: true
     xpack.security.http.ssl.enabled: false
     xpack.security.transport.ssl.enabled: false
 
-    xpack.graph.enabled: false
-    xpack.watcher.enabled: false
-    xpack.ml.enabled: false
+    # xpack.graph.enabled: false
+    # xpack.watcher.enabled: false
+    # xpack.ml.enabled: false
     
-    xpack.security.authc.api_key.enabled: false 
+    # xpack.security.authc.api_key.enabled: false 
 
 ---
 apiVersion: apps/v1
@@ -61,7 +61,7 @@ spec:
               cpu: "500m"
           volumeMounts:
             - name: config-volume
-              mountPath: /usr/share/elasticsearch/config/elasticsearch.yml 
+              mountPath: /usr/share/elasticsearch/config2/elasticsearch.yml 
               subPath: elasticsearch.yml 
             - name: esdata
               mountPath: /usr/share/elasticsearch/data 

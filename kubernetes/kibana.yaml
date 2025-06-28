@@ -15,6 +15,7 @@ data:
     xpack.apm.enabled: false 
     xpack.monitoring.enabled: false
     xpack.reporting.enabled: false
+
     
 ---
 apiVersion: apps/v1
@@ -39,7 +40,14 @@ spec:
             - containerPort: 5601
           env:
             - name: ELASTICSEARCH_HOSTS
-              value: http://elasticsearch-service:9200
+              value: https://elasticsearch-service:9200
+            - name: ELASTICSEARCH_SERVICEACCOUNTTOKEN
+              value: AAEAAWVsYXN0aWMva2liYW5hL2tpYmFuYS10b2tlbjp6ZVVNdkV6bFRQU2JXU0p2UWVNb0ln
+            - name: ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES
+              value: /usr/share/kibana/config/certs/http_ca.crt
+            - name: ELASTICSEARCH_SSL_VERIFICATIONMODE
+              value: none
+
           resources: 
             limits:
               memory: "1Gi" 
@@ -51,10 +59,16 @@ spec:
             - name: config-volume
               mountPath: /usr/share/kibana/config/kibana.yml 
               subPath: kibana.yml 
+            - name: es-ca-cert
+              mountPath: /usr/share/kibana/config/certs
+              readOnly: true
       volumes: 
         - name: config-volume
           configMap:
             name: kibana-config 
+        - name: es-ca-cert
+          secret:
+            secretName: es-ca-cert
 
 ---
 apiVersion: v1
