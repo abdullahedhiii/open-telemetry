@@ -8,82 +8,89 @@ const type = ref('')
 const loading = ref(false)
 const error = ref(null)
 const detailsData = ref(null)
-const priceHistory = ref([])
-const newsData = ref([])
 const isInWatchlist = ref(false)
-const activeTab = ref('overview')
 
-// Mock data for demonstration
-const mockStockData = {
-  symbol: 'AAPL',
-  name: 'Apple Inc.',
-  type: 'stock',
-  currentPrice: 175.43,
-  change: 2.15,
-  changePercent: 1.24,
-  marketCap: '2.75T',
-  volume: '45.2M',
-  peRatio: 28.5,
-  dividend: 0.96,
-  high52Week: 198.23,
-  low52Week: 124.17,
-  description: 'Apple Inc. designs, manufactures, and markets smartphones, personal computers, tablets, wearables, and accessories worldwide.',
-  sector: 'Technology',
-  industry: 'Consumer Electronics',
-  employees: 164000,
-  founded: '1976',
-  headquarters: 'Cupertino, CA'
-}
-
-const mockCryptoData = {
-  symbol: 'BTC',
-  name: 'Bitcoin',
-  type: 'crypto',
-  currentPrice: 43250.75,
-  change: -1250.30,
-  changePercent: -2.81,
-  marketCap: '847.5B',
-  volume: '28.7B',
-  circulatingSupply: '19.6M',
-  totalSupply: '21M',
-  high24h: 44500.00,
-  low24h: 42800.00,
-  description: 'Bitcoin is a decentralized digital currency that can be transferred on the peer-to-peer bitcoin network.',
-  category: 'Cryptocurrency',
-  algorithm: 'SHA-256',
-  blockTime: '10 minutes'
-}
-
-// Enhanced computed properties
-const formattedPrice = computed(() => {
-  if (!detailsData.value) return '$0.00'
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2
-  }).format(detailsData.value.currentPrice)
+// Computed properties for data type detection
+const dataType = computed(() => {
+  return type.value === 'stocks' ? 'stocks' : 'crypto'
 })
 
-const formattedChange = computed(() => {
-  if (!detailsData.value) return { amount: '$0.00', percent: '0.00%', isPositive: true }
-  
-  const change = detailsData.value.change
-  const changePercent = detailsData.value.changePercent
-  const isPositive = change >= 0
-  
-  return {
-    amount: `${isPositive ? '+' : ''}${new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2
-    }).format(change)}`,
-    percent: `${isPositive ? '+' : ''}${changePercent.toFixed(2)}%`,
-    isPositive
+const stockData = computed(() => {
+  if (dataType.value === 'stocks' && detailsData.value && Array.isArray(detailsData.value)) {
+    return detailsData.value[0] || null
   }
+  return dataType.value === 'stocks' ? detailsData.value : null
 })
 
-// Load details with comprehensive tracing
-async function loadDetails() {
+const cryptoData = computed(() => {
+  if (dataType.value === 'crypto' && detailsData.value && Array.isArray(detailsData.value)) {
+    return detailsData.value[0] || null
+  }
+  return dataType.value === 'crypto' ? detailsData.value : null
+})
+
+// Computed properties for stock data
+const currentPrice = computed(() => {
+  if (!stockData.value?.timeSeries) return '0.00'
+  const dates = Object.keys(stockData.value.timeSeries).sort().reverse()
+  const latestDate = dates[0]
+  return stockData.value.timeSeries[latestDate]?.close || '0.00'
+})
+
+const dayHigh = computed(() => {
+  if (!stockData.value?.timeSeries) return '0.00'
+  const dates = Object.keys(stockData.value.timeSeries).sort().reverse()
+  const latestDate = dates[0]
+  return stockData.value.timeSeries[latestDate]?.high || '0.00'
+})
+
+const dayLow = computed(() => {
+  if (!stockData.value?.timeSeries) return '0.00'
+  const dates = Object.keys(stockData.value.timeSeries).sort().reverse()
+  const latestDate = dates[0]
+  return stockData.value.timeSeries[latestDate]?.low || '0.00'
+})
+
+const currentVolume = computed(() => {
+  if (!stockData.value?.timeSeries) return '0'
+  const dates = Object.keys(stockData.value.timeSeries).sort().reverse()
+  const latestDate = dates[0]
+  return stockData.value.timeSeries[latestDate]?.volume || '0'
+})
+
+const limitedTimeSeriesData = computed(() => {
+  if (!stockData.value?.timeSeries) return {}
+  const entries = Object.entries(stockData.value.timeSeries)
+  const sortedEntries = entries.sort(([a], [b]) => new Date(b) - new Date(a))
+  const limitedEntries = sortedEntries.slice(0, 10) // Show last 10 days
+  return Object.fromEntries(limitedEntries)
+})
+
+// Utility functions
+function formatNumber(num) {
+  if (!num) return '0'
+  const number = parseFloat(num)
+  if (number >= 1e9) {
+    return (number / 1e9).toFixed(2) + 'B'
+  } else if (number >= 1e6) {
+    return (number / 1e6).toFixed(2) + 'M'
+  } else if (number >= 1e3) {
+    return (number / 1e3).toFixed(2) + 'K'
+  }
+  return number.toLocaleString()
+}
+
+function formatDate(dateString) {
+  if (!dateString) return 'N/A'
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  })
+}
+
+async function fetchData() {
   const span = tracer.startSpan('load_symbol_details', {
     attributes: {
       'symbol': symbol.value,
@@ -91,146 +98,54 @@ async function loadDetails() {
       'operation.type': 'data_fetch',
       'component': 'details_page'
     }
-  })
-  
+  });
+
   try {
-    loading.value = true
-    error.value = null
+   
+    loading.value = true;
+    error.value = null;
+
+    const detailsSpan = tracer.startSpan('fetch_symbol_data', { parent: span });
     
-    const startTime = performance.now()
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/${type.value}/${symbol.value}`);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch details: ${response.statusText}`);
+    }
+
+    const responseData = await response.json();
+    detailsData.value = responseData;
     
-    // Simulate API calls for different data types
-    const detailsSpan = tracer.startSpan('fetch_symbol_data', {
-      parent: span,
-      attributes: {
-        'api.endpoint': `/api/${type.value}/${symbol.value}`,
-        'data.type': 'symbol_details'
-      }
-    })
-    
-    await new Promise(resolve => setTimeout(resolve, 800))
-    
-    // Mock data based on type
-    if (type.value === 'stock') {
-      detailsData.value = { ...mockStockData, symbol: symbol.value }
-    } else {
-      detailsData.value = { ...mockCryptoData, symbol: symbol.value }
+    // Debug log to see the structure
+    console.log('API Response:', responseData);
+    console.log('Is Array:', Array.isArray(responseData));
+    if (Array.isArray(responseData)) {
+      console.log('First item:', responseData[0]);
     }
     
-    detailsSpan.setAttributes({
-      'data.loaded': true,
-      'symbol.name': detailsData.value.name,
-      'symbol.price': detailsData.value.currentPrice
-    })
-    detailsSpan.setStatus({ code: 1 })
-    detailsSpan.end()
-    
-    // Load price history
-    const historySpan = tracer.startSpan('fetch_price_history', {
-      parent: span,
-      attributes: {
-        'api.endpoint': `/api/${type.value}/${symbol.value}/history`,
-        'data.type': 'price_history'
-      }
-    })
-    
-    await new Promise(resolve => setTimeout(resolve, 500))
-    
-    // Generate mock price history
-    const basePrice = detailsData.value.currentPrice
-    priceHistory.value = Array.from({ length: 30 }, (_, i) => ({
-      date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      price: basePrice + (Math.random() - 0.5) * basePrice * 0.1
-    }))
-    
-    historySpan.setAttributes({
-      'history.data_points': priceHistory.value.length,
-      'history.date_range': '30_days'
-    })
-    historySpan.setStatus({ code: 1 })
-    historySpan.end()
-    
-    // Load news data
-    const newsSpan = tracer.startSpan('fetch_news_data', {
-      parent: span,
-      attributes: {
-        'api.endpoint': `/api/news/${symbol.value}`,
-        'data.type': 'news_articles'
-      }
-    })
-    
-    await new Promise(resolve => setTimeout(resolve, 300))
-    
-    newsData.value = [
-      {
-        id: 1,
-        title: `${detailsData.value.name} Reports Strong Quarterly Earnings`,
-        summary: 'Company exceeds analyst expectations with robust revenue growth.',
-        publishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        source: 'Financial Times'
-      },
-      {
-        id: 2,
-        title: `Market Analysis: ${symbol.value} Shows Bullish Momentum`,
-        summary: 'Technical indicators suggest continued upward trend.',
-        publishedAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-        source: 'MarketWatch'
-      },
-      {
-        id: 3,
-        title: `${detailsData.value.name} Announces New Product Launch`,
-        summary: 'Innovation continues to drive company growth strategy.',
-        publishedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-        source: 'Reuters'
-      }
-    ]
-    
-    newsSpan.setAttributes({
-      'news.articles_count': newsData.value.length
-    })
-    newsSpan.setStatus({ code: 1 })
-    newsSpan.end()
-    
-    // Check watchlist status
-    const watchlistSpan = tracer.startSpan('check_watchlist_status', {
-      parent: span
-    })
-    
-    const savedWatchlist = localStorage.getItem('userWatchlist')
-    if (savedWatchlist) {
-      const watchlist = JSON.parse(savedWatchlist)
-      isInWatchlist.value = watchlist.some(item => item.symbol === symbol.value)
-    }
-    
-    watchlistSpan.setAttributes({
-      'watchlist.contains_symbol': isInWatchlist.value
-    })
-    watchlistSpan.setStatus({ code: 1 })
-    watchlistSpan.end()
-    
-    const duration = performance.now() - startTime
-    
-    span.setAttributes({
-      'load.duration_ms': duration,
-      'data.sections_loaded': 4,
-      'operation.success': true
-    })
-    
-    span.setStatus({ code: 1 })
+    detailsSpan.setStatus({ code: 1 });
+    detailsSpan.end();
+
+    // Check if symbol is in watchlist
+    checkWatchlistStatus();
     
   } catch (err) {
-    error.value = err.message
-    
-    span.setAttributes({
-      'error.message': err.message,
-      'error.type': err.constructor.name,
-      'operation.success': false
-    })
-    
-    span.setStatus({ code: 2, message: err.message })
+    error.value = err.message;
+    span.setStatus({ code: 2, message: err.message });
   } finally {
-    loading.value = false
-    span.end()
+    loading.value = false;
+    span.end();
+  }
+}
+
+function checkWatchlistStatus() {
+  try {
+    const savedWatchlist = localStorage.getItem('userWatchlist')
+    let watchlist = savedWatchlist ? JSON.parse(savedWatchlist) : []
+    isInWatchlist.value = watchlist.some(item => item.symbol === symbol.value && item.type === type.value)
+  } catch (err) {
+    console.error('Error checking watchlist status:', err)
+    isInWatchlist.value = false
   }
 }
 
@@ -250,13 +165,17 @@ function toggleWatchlist() {
     
     if (isInWatchlist.value) {
       // Remove from watchlist
-      watchlist = watchlist.filter(item => item.symbol !== symbol.value)
+      watchlist = watchlist.filter(item => !(item.symbol === symbol.value && item.type === type.value))
       isInWatchlist.value = false
     } else {
       // Add to watchlist
+      const itemName = type.value === 'crypto' 
+        ? (cryptoData.value?.name || symbol.value)
+        : (stockData.value?.metaData?.symbol || stockData.value?.name || symbol.value);
+        
       watchlist.push({
         symbol: symbol.value,
-        name: detailsData.value?.name || symbol.value,
+        name: itemName,
         type: type.value,
         dateAdded: new Date().toISOString()
       })
@@ -279,25 +198,6 @@ function toggleWatchlist() {
   }
 }
 
-function switchTab(tab) {
-  const span = tracer.startSpan('switch_details_tab', {
-    attributes: {
-      'tab.previous': activeTab.value,
-      'tab.new': tab,
-      'user.action': 'tab_switch'
-    }
-  })
-  
-  activeTab.value = tab
-  
-  span.setAttributes({
-    'operation.success': true
-  })
-  span.setStatus({ code: 1 })
-  span.end()
-}
-
-// Initialize from URL parameters (in real app, use Vue Router)
 onMounted(() => {
   const span = tracer.startSpan('details_page_mounted', {
     attributes: {
@@ -306,17 +206,19 @@ onMounted(() => {
     }
   })
   
-  // Mock URL parameter parsing
-  const urlParams = new URLSearchParams(window.location.search)
-  symbol.value = urlParams.get('symbol') || 'AAPL'
-  type.value = urlParams.get('type') || 'stock'
+  // Get symbol and type from URL path or query params
+
+    type.value = window.location.pathname.includes('/stocks') ? 'stocks' : 'crypto'
+    symbol.value = window.location.pathname.split('/').pop() 
+  
   
   span.setAttributes({
     'url.symbol': symbol.value,
     'url.type': type.value
   })
   
-  loadDetails()
+  // Load data on mount
+  fetchData()
   
   span.setStatus({ code: 1 })
   span.end()
@@ -324,403 +226,224 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="details-page">
-    <!-- Header Section -->
-    <div class="header-section">
-      <div class="header-content">
-        <div class="symbol-info">
-          <div class="symbol-badge" :class="type">{{ symbol }}</div>
-          <div class="symbol-details">
-            <h1 class="symbol-name">{{ detailsData?.name || symbol }}</h1>
-            <p class="symbol-type">{{ type === 'stock' ? '📈 Stock' : '₿ Cryptocurrency' }}</p>
-          </div>
-        </div>
-        
-        <div class="price-section" v-if="detailsData">
-          <div class="current-price">{{ formattedPrice }}</div>
-          <div class="price-change" :class="{ 'positive': formattedChange.isPositive, 'negative': !formattedChange.isPositive }">
-            <span class="change-amount">{{ formattedChange.amount }}</span>
-            <span class="change-percent">{{ formattedChange.percent }}</span>
-          </div>
-        </div>
-        
-        <div class="header-actions">
-          <button 
-            @click="toggleWatchlist"
-            class="watchlist-button"
-            :class="{ 'in-watchlist': isInWatchlist }"
-          >
-            {{ isInWatchlist ? '★ In Watchlist' : '☆ Add to Watchlist' }}
-          </button>
-          
-          <button @click="loadDetails" :disabled="loading" class="refresh-button">
-            <span v-if="loading" class="loading-spinner"></span>
-            {{ loading ? 'Loading...' : 'Refresh' }}
-          </button>
-        </div>
+  <div class="app-container">
+    <div class="container">
+      <!-- Loading State -->
+      <div v-if="loading" class="loading-container">
+        <div class="spinner"></div>
+        <p>Loading data...</p>
       </div>
-    </div>
 
-    <div v-if="error" class="error-card">
-      <div class="error-icon">⚠️</div>
-      <div class="error-content">
-        <h3>Unable to load details</h3>
+      <!-- Error State -->
+      <div v-else-if="error" class="error-container">
+        <h2>Error Loading Data</h2>
         <p>{{ error }}</p>
-        <button @click="loadDetails" class="retry-button">Try Again</button>
-      </div>
-    </div>
-
-    <div v-if="loading && !detailsData" class="loading-section">
-      <div class="loading-content">
-        <div class="loading-spinner large"></div>
-        <h3>Loading {{ symbol }} details...</h3>
-        <p>Fetching latest market data and information</p>
-      </div>
-    </div>
-
-    <div v-if="detailsData" class="content-section">
-      <!-- Tab Navigation -->
-      <div class="tab-navigation">
-        <button 
-          v-for="tab in ['overview', 'chart', 'news', 'fundamentals']" 
-          :key="tab"
-          @click="switchTab(tab)"
-          class="tab-button"
-          :class="{ 'active': activeTab === tab }"
-        >
-          {{ tab.charAt(0).toUpperCase() + tab.slice(1) }}
-        </button>
+        <button @click="fetchData" class="retry-btn">Retry</button>
       </div>
 
-      <!-- Tab Content -->
-      <div class="tab-content">
-        <!-- Overview Tab -->
-        <div v-if="activeTab === 'overview'" class="overview-tab">
-          <div class="overview-grid">
-            <div class="info-card">
-              <h3>Market Data</h3>
-              <div class="info-grid">
-                <div class="info-item">
-                  <span class="info-label">Market Cap</span>
-                  <span class="info-value">{{ detailsData.marketCap }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Volume</span>
-                  <span class="info-value">{{ detailsData.volume }}</span>
-                </div>
-                <div class="info-item" v-if="type === 'stock'">
-                  <span class="info-label">P/E Ratio</span>
-                  <span class="info-value">{{ detailsData.peRatio }}</span>
-                </div>
-                <div class="info-item" v-if="type === 'crypto'">
-                  <span class="info-label">Circulating Supply</span>
-                  <span class="info-value">{{ detailsData.circulatingSupply }}</span>
-                </div>
-                <div class="info-item" v-if="type === 'stock'">
-                  <span class="info-label">52W High</span>
-                  <span class="info-value">${{ detailsData.high52Week }}</span>
-                </div>
-                <div class="info-item" v-if="type === 'crypto'">
-                  <span class="info-label">24h High</span>
-                  <span class="info-value">${{ detailsData.high24h?.toLocaleString() }}</span>
-                </div>
-              </div>
+      <!-- Stock Data Display -->
+      <div v-else-if="dataType === 'stocks' && stockData" class="content">
+        <!-- Header -->
+        <div class="header-card">
+          <div class="header-content">
+            <h1>{{ stockData.metaData?.symbol || symbol }}</h1>
+            <p class="subtitle">{{ stockData.metaData?.information || 'Stock Information' }}</p>
+            <button @click="toggleWatchlist" class="watchlist-btn" :class="{ active: isInWatchlist }">
+              {{ isInWatchlist ? 'Remove from Watchlist' : 'Add to Watchlist' }}
+            </button>
+          </div>
+          <div class="meta-grid">
+            <div class="meta-item">
+              <span class="label">Last Refreshed</span>
+              <span class="value">{{ stockData.metaData?.lastRefreshed || 'N/A' }}</span>
             </div>
-            
-            <div class="info-card">
-              <h3>About</h3>
-              <p class="description">{{ detailsData.description }}</p>
-              <div class="additional-info">
-                <div class="info-item" v-if="type === 'stock'">
-                  <span class="info-label">Sector</span>
-                  <span class="info-value">{{ detailsData.sector }}</span>
-                </div>
-                <div class="info-item" v-if="type === 'stock'">
-                  <span class="info-label">Industry</span>
-                  <span class="info-value">{{ detailsData.industry }}</span>
-                </div>
-                <div class="info-item" v-if="type === 'crypto'">
-                  <span class="info-label">Category</span>
-                  <span class="info-value">{{ detailsData.category }}</span>
-                </div>
-                <div class="info-item" v-if="type === 'crypto'">
-                  <span class="info-label">Algorithm</span>
-                  <span class="info-value">{{ detailsData.algorithm }}</span>
-                </div>
-              </div>
+            <div class="meta-item">
+              <span class="label">Output Size</span>
+              <span class="value">{{ stockData.metaData?.outputSize || 'N/A' }}</span>
+            </div>
+            <div class="meta-item">
+              <span class="label">Time Zone</span>
+              <span class="value">{{ stockData.metaData?.timeZone || 'N/A' }}</span>
+            </div>
+            <div class="meta-item">
+              <span class="label">Current Price</span>
+              <span class="value price">${{ parseFloat(currentPrice).toFixed(2) }}</span>
             </div>
           </div>
         </div>
 
-        <!-- Chart Tab -->
-        <div v-if="activeTab === 'chart'" class="chart-tab">
-          <div class="chart-container">
-            <h3>Price History (30 Days)</h3>
-            <div class="chart-placeholder">
-              <div class="chart-mock">
-                <div class="chart-line">
-                  <div 
-                    v-for="(point, index) in priceHistory" 
-                    :key="index"
-                    class="chart-point"
-                    :style="{ 
-                      left: `${(index / (priceHistory.length - 1)) * 100}%`,
-                      bottom: `${((point.price - Math.min(...priceHistory.map(p => p.price))) / 
-                        (Math.max(...priceHistory.map(p => p.price)) - Math.min(...priceHistory.map(p => p.price)))) * 80 + 10}%`
-                    }"
-                  ></div>
-                </div>
-              </div>
-              <p class="chart-note">Interactive chart would be implemented with a charting library like Chart.js or D3</p>
+        <!-- Recent Performance -->
+        <div class="performance-card">
+          <h2>Recent Performance</h2>
+          <div class="performance-grid">
+            <div class="performance-item current">
+              <span class="perf-label">Current Price</span>
+              <span class="perf-value">${{ parseFloat(currentPrice).toFixed(2) }}</span>
+            </div>
+            <div class="performance-item high">
+              <span class="perf-label">Day High</span>
+              <span class="perf-value">${{ parseFloat(dayHigh).toFixed(2) }}</span>
+            </div>
+            <div class="performance-item low">
+              <span class="perf-label">Day Low</span>
+              <span class="perf-value">${{ parseFloat(dayLow).toFixed(2) }}</span>
+            </div>
+            <div class="performance-item volume">
+              <span class="perf-label">Volume</span>
+              <span class="perf-value">{{ formatNumber(currentVolume) }}</span>
             </div>
           </div>
         </div>
 
-        <!-- News Tab -->
-        <div v-if="activeTab === 'news'" class="news-tab">
-          <h3>Latest News</h3>
-          <div class="news-list">
-            <div v-for="article in newsData" :key="article.id" class="news-item">
-              <div class="news-content">
-                <h4 class="news-title">{{ article.title }}</h4>
-                <p class="news-summary">{{ article.summary }}</p>
-                <div class="news-meta">
-                  <span class="news-source">{{ article.source }}</span>
-                  <span class="news-date">{{ new Date(article.publishedAt).toLocaleDateString() }}</span>
-                </div>
-              </div>
+        <!-- Historical Data Table -->
+        <div class="table-card">
+          <h2>Historical Data</h2>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Open</th>
+                  <th>High</th>
+                  <th>Low</th>
+                  <th>Close</th>
+                  <th>Volume</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(data, date) in limitedTimeSeriesData" :key="date">
+                  <td class="date-cell">{{ formatDate(date) }}</td>
+                  <td class="price-cell">${{ parseFloat(data.open).toFixed(2) }}</td>
+                  <td class="price-cell high-price">${{ parseFloat(data.high).toFixed(2) }}</td>
+                  <td class="price-cell low-price">${{ parseFloat(data.low).toFixed(2) }}</td>
+                  <td class="price-cell">${{ parseFloat(data.close).toFixed(2) }}</td>
+                  <td class="volume-cell">{{ formatNumber(data.volume) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Crypto Data Display -->
+      <div v-else-if="dataType === 'crypto' && cryptoData" class="content">
+        <!-- Crypto Header -->
+        <div class="header-card crypto-header">
+          <div class="crypto-title">
+            <img v-if="cryptoData.image" :src="cryptoData.image" :alt="cryptoData.name" class="crypto-icon">
+            <div>
+              <h1>{{ cryptoData.name || symbol }} {{ cryptoData.symbol ? `(${cryptoData.symbol.toUpperCase()})` : '' }}</h1>
+              <p class="subtitle" v-if="cryptoData.market_cap_rank">Rank #{{ cryptoData.market_cap_rank }}</p>
+            </div>
+          </div>
+          <div class="crypto-actions">
+            <button @click="toggleWatchlist" class="watchlist-btn" :class="{ active: isInWatchlist }">
+              {{ isInWatchlist ? 'Remove from Watchlist' : 'Add to Watchlist' }}
+            </button>
+          </div>
+          <div class="crypto-price">
+            <span class="current-price">${{ formatNumber(cryptoData.current_price) }}</span>
+            <span v-if="cryptoData.price_change_percentage_24h !== undefined" 
+                  :class="['price-change', cryptoData.price_change_percentage_24h >= 0 ? 'positive' : 'negative']">
+              {{ cryptoData.price_change_percentage_24h >= 0 ? '+' : '' }}{{ cryptoData.price_change_percentage_24h.toFixed(2) }}%
+            </span>
+          </div>
+        </div>
+
+        <!-- Crypto Stats -->
+        <div class="crypto-stats">
+          <h2>Market Statistics</h2>
+          <div class="stats-grid">
+            <div class="stat-item" v-if="cryptoData.market_cap">
+              <span class="stat-label">Market Cap</span>
+              <span class="stat-value">${{ formatNumber(cryptoData.market_cap) }}</span>
+            </div>
+            <div class="stat-item" v-if="cryptoData.total_volume">
+              <span class="stat-label">24h Volume</span>
+              <span class="stat-value">${{ formatNumber(cryptoData.total_volume) }}</span>
+            </div>
+            <div class="stat-item" v-if="cryptoData.high_24h">
+              <span class="stat-label">24h High</span>
+              <span class="stat-value">${{ formatNumber(cryptoData.high_24h) }}</span>
+            </div>
+            <div class="stat-item" v-if="cryptoData.low_24h">
+              <span class="stat-label">24h Low</span>
+              <span class="stat-value">${{ formatNumber(cryptoData.low_24h) }}</span>
+            </div>
+            <div class="stat-item" v-if="cryptoData.ath">
+              <span class="stat-label">All Time High</span>
+              <span class="stat-value">${{ formatNumber(cryptoData.ath) }}</span>
+            </div>
+            <div class="stat-item" v-if="cryptoData.circulating_supply">
+              <span class="stat-label">Circulating Supply</span>
+              <span class="stat-value">{{ formatNumber(cryptoData.circulating_supply) }}</span>
             </div>
           </div>
         </div>
 
-        <!-- Fundamentals Tab -->
-        <div v-if="activeTab === 'fundamentals'" class="fundamentals-tab">
-          <h3>{{ type === 'stock' ? 'Company Fundamentals' : 'Token Fundamentals' }}</h3>
-          <div class="fundamentals-grid">
-            <div class="fundamental-card" v-if="type === 'stock'">
-              <h4>Financial Metrics</h4>
-              <div class="metric-list">
-                <div class="metric-item">
-                  <span class="metric-label">P/E Ratio</span>
-                  <span class="metric-value">{{ detailsData.peRatio }}</span>
-                </div>
-                <div class="metric-item">
-                  <span class="metric-label">Dividend Yield</span>
-                  <span class="metric-value">{{ detailsData.dividend }}%</span>
-                </div>
-                <div class="metric-item">
-                  <span class="metric-label">Employees</span>
-                  <span class="metric-value">{{ detailsData.employees?.toLocaleString() }}</span>
-                </div>
-                <div class="metric-item">
-                  <span class="metric-label">Founded</span>
-                  <span class="metric-value">{{ detailsData.founded }}</span>
-                </div>
-              </div>
+        <!-- Additional Crypto Info -->
+        <div class="crypto-info">
+          <h2>Additional Information</h2>
+          <div class="info-grid">
+            <div class="info-item" v-if="cryptoData.ath_date">
+              <span class="info-label">All Time High Date</span>
+              <span class="info-value">{{ formatDate(cryptoData.ath_date) }}</span>
             </div>
-            
-            <div class="fundamental-card" v-if="type === 'crypto'">
-              <h4>Token Metrics</h4>
-              <div class="metric-list">
-                <div class="metric-item">
-                  <span class="metric-label">Total Supply</span>
-                  <span class="metric-value">{{ detailsData.totalSupply }}</span>
-                </div>
-                <div class="metric-item">
-                  <span class="metric-label">Circulating Supply</span>
-                  <span class="metric-value">{{ detailsData.circulatingSupply }}</span>
-                </div>
-                <div class="metric-item">
-                  <span class="metric-label">Block Time</span>
-                  <span class="metric-value">{{ detailsData.blockTime }}</span>
-                </div>
-                <div class="metric-item">
-                  <span class="metric-label">Algorithm</span>
-                  <span class="metric-value">{{ detailsData.algorithm }}</span>
-                </div>
-              </div>
+            <div class="info-item" v-if="cryptoData.atl">
+              <span class="info-label">All Time Low</span>
+              <span class="info-value">${{ formatNumber(cryptoData.atl) }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Max Supply</span>
+              <span class="info-value">{{ cryptoData.max_supply ? formatNumber(cryptoData.max_supply) : 'N/A' }}</span>
+            </div>
+            <div class="info-item" v-if="cryptoData.last_updated">
+              <span class="info-label">Last Updated</span>
+              <span class="info-value">{{ formatDate(cryptoData.last_updated) }}</span>
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- No Data State -->
+      <div v-else-if="!loading && !error" class="no-data-container">
+        <h2>No Data Available</h2>
+        <p>Unable to load {{ dataType }} data for {{ symbol }}.</p>
+        <button @click="fetchData" class="retry-btn">Try Again</button>
       </div>
     </div>
   </div>
 </template>
-
 <style scoped>
-.details-page {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 2rem;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+.app-container {
   min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-.header-section {
-  background: white;
-  border-radius: 16px;
-  padding: 2rem;
-  margin-bottom: 2rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  border: 1px solid #e2e8f0;
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
 }
 
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 2rem;
-}
-
-.symbol-info {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.symbol-badge {
-  padding: 1rem 1.5rem;
-  border-radius: 12px;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: white;
-  min-width: 80px;
-  text-align: center;
-}
-
-.symbol-badge.stock {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-}
-
-.symbol-badge.crypto {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-}
-
-.symbol-details {
-  flex: 1;
-}
-
-.symbol-name {
-  margin: 0 0 0.5rem 0;
-  font-size: 2rem;
-  font-weight: 700;
-  color: #1e293b;
-  letter-spacing: -0.025em;
-}
-
-.symbol-type {
-  margin: 0;
-  font-size: 1rem;
-  color: #64748b;
-  font-weight: 500;
-}
-
-.price-section {
-  text-align: right;
-}
-
-.current-price {
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: #1e293b;
-  margin-bottom: 0.5rem;
-}
-
-.price-change {
+.loading-container {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-}
-
-.price-change.positive {
-  color: #059669;
-}
-
-.price-change.negative {
-  color: #dc2626;
-}
-
-.change-amount {
-  font-size: 1.25rem;
-  font-weight: 600;
-}
-
-.change-percent {
-  font-size: 1rem;
-  opacity: 0.8;
-}
-
-.header-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.watchlist-button {
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-  color: white;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 12px;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: 600;
-  transition: all 0.2s ease;
-  min-width: 160px;
-}
-
-.watchlist-button.in-watchlist {
-  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-}
-
-.watchlist-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
-}
-
-.watchlist-button.in-watchlist:hover {
-  box-shadow: 0 4px 12px rgba(251, 191, 36, 0.4);
-}
-
-.refresh-button {
-  background: #f1f5f9;
-  color: #475569;
-  border: 1px solid #e2e8f0;
-  padding: 0.75rem 1.5rem;
-  border-radius: 12px;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: 600;
-  transition: all 0.2s ease;
-  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  height: 400px;
+  color: #4a5568;
 }
 
-.refresh-button:hover:not(:disabled) {
-  background: #e2e8f0;
-}
-
-.refresh-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.loading-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top: 2px solid currentColor;
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #e2e8f0;
+  border-top: 4px solid #3182ce;
   border-radius: 50%;
   animation: spin 1s linear infinite;
-}
-
-.loading-spinner.large {
-  width: 48px;
-  height: 48px;
-  border-width: 4px;
+  margin-bottom: 20px;
 }
 
 @keyframes spin {
@@ -728,399 +451,397 @@ onMounted(() => {
   100% { transform: rotate(360deg); }
 }
 
-.error-card {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-radius: 12px;
-  padding: 1.5rem;
-  margin-bottom: 2rem;
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
+.error-container {
+  background: #fed7d7;
+  border: 1px solid #feb2b2;
+  border-radius: 8px;
+  padding: 40px;
+  text-align: center;
+  margin: 20px 0;
 }
 
-.error-icon {
-  font-size: 1.5rem;
-  flex-shrink: 0;
+.error-container h2 {
+  color: #c53030;
+  margin-bottom: 10px;
 }
 
-.error-content h3 {
-  margin: 0 0 0.5rem 0;
-  color: #dc2626;
-  font-size: 1.125rem;
-  font-weight: 600;
+.error-container p {
+  color: #742a2a;
+  margin-bottom: 20px;
 }
 
-.error-content p {
-  margin: 0 0 1rem 0;
-  color: #991b1b;
-}
-
-.retry-button {
-  background: #dc2626;
+.retry-btn {
+  background: #e53e3e;
   color: white;
   border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
+  padding: 10px 20px;
+  border-radius: 5px;
   cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
+  font-size: 14px;
 }
 
-.loading-section {
+.retry-btn:hover {
+  background: #c53030;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.header-card {
   background: white;
-  border-radius: 16px;
-  padding: 4rem 2rem;
-  text-align: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 30px;
+  border-left: 4px solid #3182ce;
 }
 
-.loading-content h3 {
-  margin: 1rem 0 0.5rem 0;
+.header-card h1 {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #2d3748;
+  margin-bottom: 8px;
+}
+
+.subtitle {
+  color: #718096;
+  font-size: 1.1rem;
+  margin-bottom: 20px;
+}
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.meta-item {
+  text-align: center;
+  padding: 15px;
+  background: #f7fafc;
+  border-radius: 8px;
+}
+
+.label {
+  display: block;
+  font-size: 0.9rem;
+  color: #718096;
+  margin-bottom: 5px;
+}
+
+.value {
+  display: block;
+  font-weight: 600;
+  color: #2d3748;
+  font-size: 1.1rem;
+}
+
+.value.price {
+  color: #38a169;
+  font-size: 1.3rem;
+}
+
+.performance-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 30px;
+}
+
+.performance-card h2 {
   font-size: 1.5rem;
   font-weight: 600;
-  color: #1e293b;
+  color: #2d3748;
+  margin-bottom: 20px;
 }
 
-.loading-content p {
-  margin: 0;
-  color: #64748b;
-  font-size: 1.125rem;
-}
-
-.content-section {
-  background: white;
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  border: 1px solid #e2e8f0;
-}
-
-.tab-navigation {
-  display: flex;
-  border-bottom: 1px solid #e2e8f0;
-  background: #f8fafc;
-}
-
-.tab-button {
-  background: transparent;
-  border: none;
-  padding: 1rem 2rem;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #64748b;
-  transition: all 0.2s ease;
-  border-bottom: 3px solid transparent;
-}
-
-.tab-button:hover {
-  background: #f1f5f9;
-  color: #1e293b;
-}
-
-.tab-button.active {
-  color: #6366f1;
-  border-bottom-color: #6366f1;
-  background: white;
-}
-
-.tab-content {
-  padding: 2rem;
-}
-
-.overview-grid {
+.performance-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
 }
 
-.info-card {
-  background: #f8fafc;
-  border-radius: 12px;
-  padding: 1.5rem;
+.performance-item {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.performance-item.current {
+  background: #ebf8ff;
+  border: 1px solid #bee3f8;
+}
+
+.performance-item.high {
+  background: #f0fff4;
+  border: 1px solid #c6f6d5;
+}
+
+.performance-item.low {
+  background: #fff5f5;
+  border: 1px solid #fed7d7;
+}
+
+.performance-item.volume {
+  background: #f7fafc;
   border: 1px solid #e2e8f0;
 }
 
-.info-card h3 {
-  margin: 0 0 1rem 0;
-  font-size: 1.25rem;
+.perf-label {
+  font-size: 0.9rem;
+  color: #718096;
+  margin-bottom: 8px;
+}
+
+.perf-value {
+  font-size: 1.3rem;
+  font-weight: bold;
+}
+
+.performance-item.current .perf-value {
+  color: #3182ce;
+}
+
+.performance-item.high .perf-value {
+  color: #38a169;
+}
+
+.performance-item.low .perf-value {
+  color: #e53e3e;
+}
+
+.performance-item.volume .perf-value {
+  color: #4a5568;
+}
+
+.table-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 30px;
+}
+
+.table-card h2 {
+  font-size: 1.5rem;
   font-weight: 600;
-  color: #1e293b;
+  color: #2d3748;
+  margin-bottom: 20px;
+}
+
+.table-container {
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.data-table th {
+  background: #f7fafc;
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #4a5568;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.data-table th:not(:first-child) {
+  text-align: right;
+}
+
+.data-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.data-table tr:hover {
+  background: #f7fafc;
+}
+
+.date-cell {
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.price-cell {
+  text-align: right;
+  font-weight: 500;
+  color: #4a5568;
+}
+
+.high-price {
+  color: #38a169;
+}
+
+.low-price {
+  color: #e53e3e;
+}
+
+.volume-cell {
+  text-align: right;
+  color: #718096;
+}
+
+/* Crypto specific styles */
+.crypto-header {
+  border-left-color: #f6ad55;
+}
+
+.crypto-title {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.crypto-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+}
+
+.crypto-price {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.current-price {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #2d3748;
+}
+
+.price-change {
+  font-size: 1.2rem;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 20px;
+}
+
+.price-change.positive {
+  background: #c6f6d5;
+  color: #2f855a;
+}
+
+.price-change.negative {
+  background: #fed7d7;
+  color: #c53030;
+}
+
+.crypto-stats {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 30px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  background: #f7fafc;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  color: #718096;
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #2d3748;
+}
+
+.crypto-info {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 30px;
+}
+
+.crypto-info h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 20px;
 }
 
 .info-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
 }
 
 .info-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem 0;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.info-item:last-child {
-  border-bottom: none;
+  padding: 15px;
+  background: #f7fafc;
+  border-radius: 8px;
 }
 
 .info-label {
   font-weight: 500;
-  color: #64748b;
+  color: #4a5568;
 }
 
 .info-value {
   font-weight: 600;
-  color: #1e293b;
-}
-
-.description {
-  color: #64748b;
-  line-height: 1.6;
-  margin-bottom: 1rem;
-}
-
-.additional-info {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-}
-
-.chart-container {
-  text-align: center;
-}
-
-.chart-container h3 {
-  margin: 0 0 2rem 0;
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #1e293b;
-}
-
-.chart-placeholder {
-  background: #f8fafc;
-  border-radius: 12px;
-  padding: 2rem;
-  border: 1px solid #e2e8f0;
-  min-height: 400px;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-}
-
-.chart-mock {
-  width: 100%;
-  height: 300px;
-  position: relative;
-  background: linear-gradient(to right, #f1f5f9 0%, #f1f5f9 100%);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.chart-line {
-  position: relative;
-  width: 100%;
-  height: 100%;
-}
-
-.chart-point {
-  position: absolute;
-  width: 4px;
-  height: 4px;
-  background: #6366f1;
-  border-radius: 50%;
-  transform: translate(-50%, 50%);
-}
-
-.chart-note {
-  margin-top: 1rem;
-  color: #64748b;
-  font-style: italic;
-}
-
-.news-tab h3 {
-  margin: 0 0 1.5rem 0;
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #1e293b;
-}
-
-.news-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.news-item {
-  background: #f8fafc;
-  border-radius: 12px;
-  padding: 1.5rem;
-  border: 1px solid #e2e8f0;
-  transition: all 0.2s ease;
-}
-
-.news-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.news-title {
-  margin: 0 0 0.5rem 0;
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #1e293b;
-  line-height: 1.4;
-}
-
-.news-summary {
-  margin: 0 0 1rem 0;
-  color: #64748b;
-  line-height: 1.5;
-}
-
-.news-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.875rem;
-  color: #64748b;
-}
-
-.news-source {
-  font-weight: 500;
-}
-
-.fundamentals-tab h3 {
-  margin: 0 0 1.5rem 0;
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #1e293b;
-}
-
-.fundamentals-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: 2rem;
-}
-
-.fundamental-card {
-  background: #f8fafc;
-  border-radius: 12px;
-  padding: 1.5rem;
-  border: 1px solid #e2e8f0;
-}
-
-.fundamental-card h4 {
-  margin: 0 0 1rem 0;
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #1e293b;
-}
-
-.metric-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.metric-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem 0;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.metric-item:last-child {
-  border-bottom: none;
-}
-
-.metric-label {
-  font-weight: 500;
-  color: #64748b;
-}
-
-.metric-value {
-  font-weight: 600;
-  color: #1e293b;
-}
-
-/* Responsive Design */
-@media (max-width: 1024px) {
-  .header-content {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 1.5rem;
-  }
-  
-  .symbol-info {
-    justify-content: center;
-  }
-  
-  .price-section {
-    text-align: center;
-  }
-  
-  .header-actions {
-    flex-direction: row;
-    justify-content: center;
-  }
-  
-  .overview-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .fundamentals-grid {
-    grid-template-columns: 1fr;
-  }
+  color: #2d3748;
 }
 
 @media (max-width: 768px) {
-  .details-page {
-    padding: 1rem;
+  .container {
+    padding: 10px;
   }
   
-  .header-section {
-    padding: 1.5rem;
-  }
-  
-  .symbol-name {
-    font-size: 1.5rem;
-  }
-  
-  .current-price {
+  .header-card h1 {
     font-size: 2rem;
   }
   
-  .tab-navigation {
-    overflow-x: auto;
-  }
-  
-  .tab-button {
-    white-space: nowrap;
-    padding: 1rem 1.5rem;
-  }
-  
-  .tab-content {
-    padding: 1.5rem;
-  }
-  
-  .info-grid {
+  .meta-grid,
+  .performance-grid,
+  .stats-grid {
     grid-template-columns: 1fr;
   }
   
-  .additional-info {
-    grid-template-columns: 1fr;
+  .current-price {
+    font-size: 1.5rem;
   }
   
-  .chart-mock {
-    height: 200px;
+  .crypto-title {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .crypto-price {
+    justify-content: center;
+  }
+  
+  .info-item {
+    flex-direction: column;
+    text-align: center;
+    gap: 10px;
   }
 }
 </style>

@@ -11,7 +11,6 @@ const searchQuery = ref('')
 const sortBy = ref('symbol')
 const sortOrder = ref('asc')
 
-// Enhanced computed properties with tracing
 const filteredAndSortedSymbols = computed(() => {
   const span = tracer.startSpan('filter_and_sort_stocks', {
     attributes: {
@@ -64,7 +63,6 @@ const filteredAndSortedSymbols = computed(() => {
   }
 })
 
-// Enhanced fetch function with comprehensive tracing
 async function fetchSymbols() {
   const mainSpan = tracer.startSpan('fetchStockSymbols', {
     attributes: {
@@ -91,7 +89,7 @@ async function fetchSymbols() {
     
     const apiUrl = import.meta.env.VITE_API_URL || ""
     const fullUrl = `${apiUrl}/stocks/symbols`
-    
+    console.log(apiUrl)
     mainSpan.setAttributes({
       'api.url': fullUrl,
       'http.method': 'GET',
@@ -204,7 +202,7 @@ function viewDetails(symbol, name) {
     })
     
     // Enhanced user interaction - could be replaced with actual navigation
-    alert(`Viewing details for ${name ? `${name} (${symbol})` : symbol}`)
+    window.location = '/details/stocks/' + symbol
     
     span.setAttributes({
       'operation.success': true,
@@ -351,7 +349,6 @@ function updateSort(field) {
   }
 }
 
-// Component lifecycle tracking
 onMounted(() => {
   const span = tracer.startSpan('stock_dashboard_mounted', {
     attributes: {

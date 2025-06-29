@@ -81,7 +81,7 @@ async function fetchSymbols() {
     
     const data = await response.json()
     const processedSymbols = Array.isArray(data) ? data : data.symbols || []
-    
+    console.log(processedSymbols)
     processingSpan.setAttributes({
       'data.symbols_count': processedSymbols.length,
       'data.processing_time_ms': performance.now() - endTime
@@ -134,8 +134,7 @@ function viewDetails(symbolId, symbolName) {
       'page.section': 'symbol_table'
     })
     
-    alert(`Viewing details for ${symbolName || symbolId}`)
-    
+    window.location = `/details/crypto/${symbolId}`
     span.setAttributes({
       'operation.success': true
     })

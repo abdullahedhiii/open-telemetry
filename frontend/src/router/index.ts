@@ -19,8 +19,13 @@ const router = createRouter({
       component: () => import('@/views/Watchlist.vue'),
     },
     {
-      path: '/details',
-      name: 'details',
+      path: '/details/stocks/:symbol',
+      name: 'detail_stocks',
+      component: () => import('@/views/Details.vue'),
+    },
+    {
+      path: '/details/crypto/:symbolId',
+      name: 'detail_crypto',
       component: () => import('@/views/Details.vue'),
     }
   
