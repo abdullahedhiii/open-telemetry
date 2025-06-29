@@ -1,17 +1,15 @@
-# First create a PersistentVolume and PersistentVolumeClaim
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: shared-logs-pvc
 spec:
   accessModes:
-    - ReadWriteMany  # This allows multiple pods to mount the same volume
+    - ReadWriteMany  #  allows multiple pods to mount the same volume
   resources:
     requests:
       storage: 1Gi
 
 ---
-# Updated Backend Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:

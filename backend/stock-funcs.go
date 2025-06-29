@@ -21,6 +21,11 @@ import (
 
 const apiKey = "26AMBY8WA3V0FCMD"
 
+type stockData struct {
+	Symbol string
+	Name   string
+}
+
 func getAllStockSymbols(w http.ResponseWriter, r *http.Request) {
 	ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
 	tracer := otel.Tracer("stock-tracker-app-tracer")
@@ -96,7 +101,7 @@ func getAllStockSymbols(w http.ResponseWriter, r *http.Request) {
 
 	reader := csv.NewReader(response.Body)
 	reader.Read()
-	var symbols []string
+	var symbols []stockData
 
 	_, readCsvSpan := tracer.Start(ctx, "processCsvResponse")
 	defer readCsvSpan.End()
@@ -117,7 +122,7 @@ func getAllStockSymbols(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if strings.TrimSpace(record[6]) == "Active" {
-			symbols = append(symbols, record[0])
+			symbols = append(symbols, stockData{record[0], record[1]})
 		}
 	}
 	readCsvSpan.SetAttributes(attribute.Int("symbols.active_count", len(symbols)))
@@ -264,6 +269,7 @@ func getStockData(w http.ResponseWriter, r *http.Request) {
 
 type coinData struct {
 	Symbol string
+	Name   string
 	Id     string
 }
 

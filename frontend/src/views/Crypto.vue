@@ -8,10 +8,10 @@ const error = ref(null)
 const loading = ref(false)
 const watchlist = ref([])
 
-async function fetchSymbols() {
+async function fetcCoins() {
     error.value = null
     loading.value = true
-    const span = tracer.startSpan('fetchStockSymbols')
+    const span = tracer.startSpan('fetchCoinSymbols')
     const ctx = trace.setSpan(context.active(), span)
 
     try {
@@ -19,9 +19,9 @@ async function fetchSymbols() {
         propagation.inject(ctx, headers)
         headers['Content-Type'] = 'application/json'
         const apiUrl = import.meta.env.VITE_API_URL || ""
-        span.setAttribute('api.url', apiUrl + '/stocks/symbols')
+        span.setAttribute('api.url', apiUrl + '/crypto/symbols')
 
-        const response = await fetch(`${apiUrl}/stocks/symbols`, {
+        const response = await fetch(`${apiUrl}/crypto/symbols`, {
             method: 'GET',
             headers: headers
         })
@@ -75,7 +75,7 @@ function isInWatchlist(symbol) {
                 :disabled="loading"
                 class="fetch-btn"
             >
-                {{ loading ? 'Loading...' : 'Fetch Stock Symbols' }}
+                {{ loading ? 'Loading...' : 'Fetch Crypto Symbols' }}
             </button>
         </div>
 
@@ -93,16 +93,16 @@ function isInWatchlist(symbol) {
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="stock in symbols" :key="stock.Symbol">
+                    <tr v-for="stock in symbols" :key="stock.Id ">
                         <td class="symbol-cell">
                             <div class="symbol-info">
-                                <span class="symbol">{{ stock.Symbol  }}</span>
-                                <span v-if="stock.name" class="name">{{ stock.Name }}</span>
+                                <span class="symbol">{{ stock.Symbol }}</span>
+                                <span v-if="stock.v" class="name">{{ stock.Name }}</span>
                             </div>
                         </td>
                         <td class="action-cell">
                             <button 
-                                @click="viewDetails(stock.Symbol)"
+                                @click="viewDetails(stock.Id )"
                                 class="view-btn"
                             >
                                 View Details
@@ -110,15 +110,15 @@ function isInWatchlist(symbol) {
                         </td>
                         <td class="action-cell">
                             <button 
-                                v-if="!isInWatchlist(stock.Symbol )"
-                                @click="addToWatchlist(stock.Symbol )"
+                                v-if="!isInWatchlist(stock.Id )"
+                                @click="addToWatchlist(stock.Id )"
                                 class="add-btn"
                             >
                                 Add to List
                             </button>
                             <button 
                                 v-else
-                                @click="removeFromWatchlist(stock.Symbol)"
+                                @click="removeFromWatchlist(stock.Id )"
                                 class="remove-btn"
                             >
                                 Remove
@@ -143,7 +143,7 @@ function isInWatchlist(symbol) {
         </div>
 
         <div v-if="!loading && symbols.length === 0 && !error" class="empty-state">
-            Click "Fetch Stock Symbols" to load data
+            Click "Fetch Crypto Symbols" to load data
         </div>
     </div>
 </template>
