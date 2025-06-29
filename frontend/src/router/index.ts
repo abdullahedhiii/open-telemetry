@@ -12,6 +12,16 @@ const router = createRouter({
       path : '/crypto',
       name : 'crypto',
       component: () => import('@/views/Crypto.vue'),
+    },
+    {
+      path: '/watchlist',
+      name: 'watchlist',
+      component: () => import('@/views/Watchlist.vue'),
+    },
+    {
+      path: '/details',
+      name: 'details',
+      component: () => import('@/views/Details.vue'),
     }
   
   

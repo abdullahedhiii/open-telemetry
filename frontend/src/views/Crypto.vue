@@ -1,383 +1,846 @@
 <script setup>
 import { tracer } from '../tracing.js'
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { context, propagation, trace } from '@opentelemetry/api'
 
 const symbols = ref([])
 const error = ref(null)
 const loading = ref(false)
 const watchlist = ref([])
+const searchQuery = ref('')
+const filteredSymbols = ref([])
 
-async function fetcCoins() {
+// Enhanced tracing with more detailed instrumentation
+async function fetchSymbols() {
+  const mainSpan = tracer.startSpan('fetchCryptoSymbols', {
+    attributes: {
+      'operation.type': 'data_fetch',
+      'component': 'crypto_dashboard',
+      'user.action': 'fetch_symbols'
+    }
+  })
+  
+  const ctx = trace.setSpan(context.active(), mainSpan)
+  
+  try {
     error.value = null
     loading.value = true
-    const span = tracer.startSpan('fetchCoinSymbols')
-    const ctx = trace.setSpan(context.active(), span)
-
-    try {
-        const headers = {}
-        propagation.inject(ctx, headers)
-        headers['Content-Type'] = 'application/json'
-        const apiUrl = import.meta.env.VITE_API_URL || ""
-        span.setAttribute('api.url', apiUrl + '/crypto/symbols')
-
-        const response = await fetch(`${apiUrl}/crypto/symbols`, {
-            method: 'GET',
-            headers: headers
-        })
-        span.setAttribute('http.status_code', response.status)
-
-        if (!response.ok) throw new Error("Network response was not ok")
-        const data = await response.json()
-        
-        // Parse the data - assuming it's an array of stock objects
-        symbols.value = Array.isArray(data) ? data : data.symbols || []
-        span.setStatus({ code: 1 })
-    } catch (err) {
-        error.value = err.message
-        span.setStatus({ code: 2, message: err.message })
-    } finally {
-        loading.value = false
-        span.end()
+    
+    // Add performance tracking
+    const startTime = performance.now()
+    mainSpan.setAttribute('fetch.start_time', startTime)
+    
+    const headers = {}
+    propagation.inject(ctx, headers)
+    headers['Content-Type'] = 'application/json'
+    
+    const apiUrl = import.meta.env.VITE_API_URL || ""
+    const fullUrl = `${apiUrl}/crypto/symbols`
+    
+    mainSpan.setAttributes({
+      'api.url': fullUrl,
+      'http.method': 'GET',
+      'api.endpoint': '/crypto/symbols'
+    })
+    
+    // Create a child span for the actual HTTP request
+    const httpSpan = tracer.startSpan('http_request', {
+      parent: ctx,
+      attributes: {
+        'http.url': fullUrl,
+        'http.method': 'GET'
+      }
+    })
+    
+    const response = await fetch(fullUrl, {
+      method: 'GET',
+      headers: headers
+    })
+    
+    const endTime = performance.now()
+    const duration = endTime - startTime
+    
+    httpSpan.setAttributes({
+      'http.status_code': response.status,
+      'http.response_time_ms': duration
+    })
+    
+    mainSpan.setAttributes({
+      'http.status_code': response.status,
+      'fetch.duration_ms': duration
+    })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
+    
+    // Create span for data processing
+    const processingSpan = tracer.startSpan('process_response_data', {
+      parent: ctx
+    })
+    
+    const data = await response.json()
+    const processedSymbols = Array.isArray(data) ? data : data.symbols || []
+    
+    processingSpan.setAttributes({
+      'data.symbols_count': processedSymbols.length,
+      'data.processing_time_ms': performance.now() - endTime
+    })
+    
+    symbols.value = processedSymbols
+    filteredSymbols.value = processedSymbols
+    
+    mainSpan.setAttributes({
+      'symbols.count': processedSymbols.length,
+      'operation.success': true
+    })
+    
+    httpSpan.setStatus({ code: 1 })
+    processingSpan.setStatus({ code: 1 })
+    mainSpan.setStatus({ code: 1 })
+    
+    httpSpan.end()
+    processingSpan.end()
+    
+  } catch (err) {
+    error.value = err.message
+    
+    mainSpan.setAttributes({
+      'error.message': err.message,
+      'error.type': err.constructor.name,
+      'operation.success': false
+    })
+    
+    mainSpan.setStatus({ code: 2, message: err.message })
+  } finally {
+    loading.value = false
+    mainSpan.end()
+  }
 }
 
-function viewDetails(symbol) {
-    // Handle view details functionality
-    alert(`Viewing details for ${symbol}`)
-    // You can replace this with navigation to a detail page or open a modal
-}
-
-function addToWatchlist(symbol) {
-    if (!watchlist.value.includes(symbol)) {
-        watchlist.value.push(symbol)
+function viewDetails(symbolId, symbolName) {
+  const span = tracer.startSpan('view_symbol_details', {
+    attributes: {
+      'symbol.id': symbolId,
+      'symbol.name': symbolName,
+      'user.action': 'view_details'
     }
+  })
+  
+  try {
+    // Enhanced user interaction tracking
+    span.setAttributes({
+      'interaction.timestamp': Date.now(),
+      'page.section': 'symbol_table'
+    })
+    
+    alert(`Viewing details for ${symbolName || symbolId}`)
+    
+    span.setAttributes({
+      'operation.success': true
+    })
+    span.setStatus({ code: 1 })
+  } catch (err) {
+    span.setStatus({ code: 2, message: err.message })
+  } finally {
+    span.end()
+  }
 }
 
-function removeFromWatchlist(symbol) {
-    const index = watchlist.value.indexOf(symbol)
+function addToWatchlist(symbolId) {
+  const span = tracer.startSpan('add_to_watchlist', {
+    attributes: {
+      'symbol.id': symbolId,
+      'user.action': 'add_watchlist',
+      'watchlist.size_before': watchlist.value.length
+    }
+  })
+  
+  try {
+    if (!watchlist.value.includes(symbolId)) {
+      watchlist.value.push(symbolId)
+      
+      span.setAttributes({
+        'watchlist.size_after': watchlist.value.length,
+        'operation.success': true,
+        'watchlist.action': 'added'
+      })
+    } else {
+      span.setAttributes({
+        'operation.success': false,
+        'error.reason': 'symbol_already_exists'
+      })
+    }
+    
+    span.setStatus({ code: 1 })
+  } catch (err) {
+    span.setStatus({ code: 2, message: err.message })
+  } finally {
+    span.end()
+  }
+}
+
+function removeFromWatchlist(symbolId) {
+  const span = tracer.startSpan('remove_from_watchlist', {
+    attributes: {
+      'symbol.id': symbolId,
+      'user.action': 'remove_watchlist',
+      'watchlist.size_before': watchlist.value.length
+    }
+  })
+  
+  try {
+    const index = watchlist.value.indexOf(symbolId)
     if (index > -1) {
-        watchlist.value.splice(index, 1)
+      watchlist.value.splice(index, 1)
+      
+      span.setAttributes({
+        'watchlist.size_after': watchlist.value.length,
+        'operation.success': true,
+        'watchlist.action': 'removed'
+      })
     }
+    
+    span.setStatus({ code: 1 })
+  } catch (err) {
+    span.setStatus({ code: 2, message: err.message })
+  } finally {
+    span.end()
+  }
 }
 
-function isInWatchlist(symbol) {
-    return watchlist.value.includes(symbol)
+function isInWatchlist(symbolId) {
+  return watchlist.value.includes(symbolId)
 }
+
+function filterSymbols() {
+  const span = tracer.startSpan('filter_symbols', {
+    attributes: {
+      'search.query': searchQuery.value,
+      'symbols.total_count': symbols.value.length
+    }
+  })
+  
+  try {
+    if (!searchQuery.value.trim()) {
+      filteredSymbols.value = symbols.value
+    } else {
+      filteredSymbols.value = symbols.value.filter(stock => 
+        stock.Symbol?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+        stock.Name?.toLowerCase().includes(searchQuery.value.toLowerCase())
+      )
+    }
+    
+    span.setAttributes({
+      'symbols.filtered_count': filteredSymbols.value.length,
+      'filter.has_results': filteredSymbols.value.length > 0
+    })
+    
+    span.setStatus({ code: 1 })
+  } catch (err) {
+    span.setStatus({ code: 2, message: err.message })
+  } finally {
+    span.end()
+  }
+}
+
+// Track component lifecycle
+onMounted(() => {
+  const span = tracer.startSpan('component_mounted', {
+    attributes: {
+      'component': 'crypto_dashboard',
+      'lifecycle.event': 'mounted'
+    }
+  })
+  
+  span.setStatus({ code: 1 })
+  span.end()
+})
 </script>
 
 <template>
-    <div class="stocks-container">
-        <div class="header">
-            <h2>Stock Symbols</h2>
-            <button 
-                @click="fetchSymbols" 
-                :disabled="loading"
-                class="fetch-btn"
-            >
-                {{ loading ? 'Loading...' : 'Fetch Crypto Symbols' }}
-            </button>
+  <div class="crypto-dashboard">
+    <div class="header-section">
+      <div class="header-content">
+        <div class="title-section">
+          <h1 class="main-title">Cryptocurrency Symbols</h1>
+          <p class="subtitle">Discover and track your favorite crypto assets</p>
         </div>
-
-        <div v-if="error" class="error-message">
-            <strong>Error:</strong> {{ error }}
+        
+        <div class="actions-section">
+          <div class="search-container">
+            <input 
+              v-model="searchQuery"
+              @input="filterSymbols"
+              type="text"
+              placeholder="Search symbols..."
+              class="search-input"
+            />
+          </div>
+          
+          <button 
+            @click="fetchSymbols" 
+            :disabled="loading"
+            class="fetch-button"
+          >
+            <span v-if="loading" class="loading-spinner"></span>
+            {{ loading ? 'Loading...' : 'Fetch Symbols' }}
+          </button>
         </div>
-
-        <div v-if="symbols.length > 0" class="table-container">
-            <table class="stocks-table">
-                <thead>
-                    <tr>
-                        <th>Symbol</th>
-                        <th>View Details</th>
-                        <th>Add to List</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="stock in symbols" :key="stock.Id ">
-                        <td class="symbol-cell">
-                            <div class="symbol-info">
-                                <span class="symbol">{{ stock.Symbol }}</span>
-                                <span v-if="stock.v" class="name">{{ stock.Name }}</span>
-                            </div>
-                        </td>
-                        <td class="action-cell">
-                            <button 
-                                @click="viewDetails(stock.Id )"
-                                class="view-btn"
-                            >
-                                View Details
-                            </button>
-                        </td>
-                        <td class="action-cell">
-                            <button 
-                                v-if="!isInWatchlist(stock.Id )"
-                                @click="addToWatchlist(stock.Id )"
-                                class="add-btn"
-                            >
-                                Add to List
-                            </button>
-                            <button 
-                                v-else
-                                @click="removeFromWatchlist(stock.Id )"
-                                class="remove-btn"
-                            >
-                                Remove
-                            </button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div v-if="watchlist.length > 0" class="watchlist-section">
-            <h3>Your Watchlist ({{ watchlist.length }} items)</h3>
-            <div class="watchlist-items">
-                <span 
-                    v-for="symbol in watchlist" 
-                    :key="symbol" 
-                    class="watchlist-item"
-                >
-                    {{ symbol }}
-                </span>
-            </div>
-        </div>
-
-        <div v-if="!loading && symbols.length === 0 && !error" class="empty-state">
-            Click "Fetch Crypto Symbols" to load data
-        </div>
+      </div>
     </div>
+
+    <div v-if="error" class="error-card">
+      <div class="error-icon">⚠️</div>
+      <div class="error-content">
+        <h3>Something went wrong</h3>
+        <p>{{ error }}</p>
+      </div>
+    </div>
+
+    <div v-if="filteredSymbols.length > 0" class="table-section">
+      <div class="table-header">
+        <h2>Available Symbols</h2>
+        <span class="symbol-count">{{ filteredSymbols.length }} symbols</span>
+      </div>
+      
+      <div class="table-container">
+        <table class="symbols-table">
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Name</th>
+              <th class="actions-header">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="stock in filteredSymbols" :key="stock.Id" class="symbol-row">
+              <td class="symbol-cell">
+                <div class="symbol-badge">{{ stock.Symbol }}</div>
+              </td>
+              <td class="name-cell">
+                <span class="symbol-name">{{ stock.Name || 'N/A' }}</span>
+              </td>
+              <td class="actions-cell">
+                <div class="action-buttons">
+                  <button 
+                    @click="viewDetails(stock.Id, stock.Symbol)"
+                    class="action-button view-button"
+                  >
+                    View Details
+                  </button>
+                  
+                  <button 
+                    v-if="!isInWatchlist(stock.Id)"
+                    @click="addToWatchlist(stock.Id)"
+                    class="action-button add-button"
+                  >
+                    Add to List
+                  </button>
+                  
+                  <button 
+                    v-else
+                    @click="removeFromWatchlist(stock.Id)"
+                    class="action-button remove-button"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div v-if="watchlist.length > 0" class="watchlist-section">
+      <div class="watchlist-header">
+        <h2>Your Watchlist</h2>
+        <span class="watchlist-count">{{ watchlist.length }} items</span>
+      </div>
+      
+      <div class="watchlist-grid">
+        <div 
+          v-for="symbolId in watchlist" 
+          :key="symbolId" 
+          class="watchlist-item"
+        >
+          <span class="watchlist-symbol">{{ symbolId }}</span>
+          <button 
+            @click="removeFromWatchlist(symbolId)"
+            class="remove-from-watchlist"
+          >
+            ×
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="!loading && filteredSymbols.length === 0 && !error" class="empty-state">
+      <div class="empty-icon">📊</div>
+      <h3>No symbols found</h3>
+      <p v-if="searchQuery">Try adjusting your search terms</p>
+      <p v-else>Click "Fetch Symbols" to load cryptocurrency data</p>
+    </div>
+  </div>
 </template>
 
 <style scoped>
-.stocks-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+.crypto-dashboard {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  min-height: 100vh;
 }
 
-.header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 30px;
-    padding-bottom: 20px;
-    border-bottom: 2px solid #e0e0e0;
+.header-section {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e2e8f0;
 }
 
-.header h2 {
-    margin: 0;
-    color: #333;
-    font-size: 2rem;
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 2rem;
 }
 
-.fetch-btn {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 16px;
-    font-weight: 600;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+.title-section {
+  flex: 1;
 }
 
-.fetch-btn:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+.main-title {
+  margin: 0 0 0.5rem 0;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #1e293b;
+  letter-spacing: -0.025em;
 }
 
-.fetch-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none;
+.subtitle {
+  margin: 0;
+  font-size: 1.125rem;
+  color: #64748b;
+  font-weight: 400;
 }
 
-.error-message {
-    background: #fee;
-    color: #d00;
-    padding: 15px;
-    border-radius: 8px;
-    border-left: 4px solid #d00;
-    margin-bottom: 20px;
+.actions-section {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.search-container {
+  position: relative;
+}
+
+.search-input {
+  padding: 0.75rem 1rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 1rem;
+  width: 250px;
+  transition: all 0.2s ease;
+  background: #f8fafc;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.fetch-button {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 140px;
+  justify-content: center;
+}
+
+.fetch-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.fetch-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-card {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.error-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.error-content h3 {
+  margin: 0 0 0.5rem 0;
+  color: #dc2626;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.error-content p {
+  margin: 0;
+  color: #991b1b;
+}
+
+.table-section {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e2e8f0;
+  margin-bottom: 2rem;
+}
+
+.table-header {
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8fafc;
+}
+
+.table-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.symbol-count {
+  background: #e0e7ff;
+  color: #3730a3;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 500;
 }
 
 .table-container {
-    background: white;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-    margin-bottom: 30px;
+  overflow-x: auto;
 }
 
-.stocks-table {
-    width: 100%;
-    border-collapse: collapse;
+.symbols-table {
+  width: 100%;
+  border-collapse: collapse;
 }
 
-.stocks-table thead {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+.symbols-table thead {
+  background: #f1f5f9;
 }
 
-.stocks-table th {
-    padding: 20px;
-    text-align: left;
-    font-weight: 600;
-    font-size: 16px;
-    letter-spacing: 0.5px;
+.symbols-table th {
+  padding: 1rem 1.5rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #e2e8f0;
 }
 
-.stocks-table tbody tr {
-    border-bottom: 1px solid #f0f0f0;
-    transition: background-color 0.2s ease;
+.actions-header {
+  text-align: center;
 }
 
-.stocks-table tbody tr:hover {
-    background-color: #f8f9ff;
+.symbol-row {
+  transition: background-color 0.2s ease;
 }
 
-.stocks-table tbody tr:last-child {
-    border-bottom: none;
+.symbol-row:hover {
+  background: #f8fafc;
 }
 
-.stocks-table td {
-    padding: 20px;
-    vertical-align: middle;
+.symbols-table td {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
 }
 
 .symbol-cell {
-    font-weight: 600;
+  font-weight: 600;
 }
 
-.symbol-info .symbol {
-    display: block;
-    font-size: 18px;
-    color: #333;
-    font-weight: 700;
+.symbol-badge {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  display: inline-block;
+  min-width: 60px;
+  text-align: center;
 }
 
-.symbol-info .name {
-    display: block;
-    font-size: 14px;
-    color: #666;
-    margin-top: 4px;
-    font-weight: 400;
+.name-cell {
+  color: #64748b;
+  font-size: 0.875rem;
 }
 
-.action-cell {
-    text-align: center;
+.symbol-name {
+  font-weight: 500;
 }
 
-.view-btn, .add-btn, .remove-btn {
-    padding: 10px 20px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 600;
-    transition: all 0.3s ease;
-    min-width: 120px;
+.actions-cell {
+  text-align: center;
 }
 
-.view-btn {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    color: white;
-    box-shadow: 0 4px 15px rgba(79, 172, 254, 0.4);
+.action-buttons {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
 }
 
-.view-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(79, 172, 254, 0.6);
+.action-button {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  min-width: 100px;
 }
 
-.add-btn {
-    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
-    color: #333;
-    box-shadow: 0 4px 15px rgba(168, 237, 234, 0.4);
+.view-button {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
 }
 
-.add-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(168, 237, 234, 0.6);
+.view-button:hover {
+  background: #0369a1;
+  color: white;
+  transform: translateY(-1px);
 }
 
-.remove-btn {
-    background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
-    color: #333;
-    box-shadow: 0 4px 15px rgba(255, 154, 158, 0.4);
+.add-button {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
 }
 
-.remove-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(255, 154, 158, 0.6);
+.add-button:hover {
+  background: #166534;
+  color: white;
+  transform: translateY(-1px);
+}
+
+.remove-button {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.remove-button:hover {
+  background: #dc2626;
+  color: white;
+  transform: translateY(-1px);
 }
 
 .watchlist-section {
-    background: white;
-    padding: 25px;
-    border-radius: 12px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e2e8f0;
+  margin-bottom: 2rem;
 }
 
-.watchlist-section h3 {
-    margin: 0 0 20px 0;
-    color: #333;
-    font-size: 1.5rem;
+.watchlist-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
 }
 
-.watchlist-items {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
+.watchlist-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.watchlist-count {
+  background: #fef3c7;
+  color: #92400e;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.watchlist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
 }
 
 .watchlist-item {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 14px;
-    font-weight: 600;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border: 1px solid #bae6fd;
+  border-radius: 12px;
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.watchlist-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.watchlist-symbol {
+  font-weight: 600;
+  color: #0369a1;
+}
+
+.remove-from-watchlist {
+  background: #fee2e2;
+  color: #dc2626;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.remove-from-watchlist:hover {
+  background: #dc2626;
+  color: white;
 }
 
 .empty-state {
-    text-align: center;
-    padding: 60px 20px;
-    color: #666;
-    font-size: 18px;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  padding: 4rem 2rem;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e2e8f0;
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.empty-state p {
+  margin: 0;
+  color: #64748b;
+  font-size: 1.125rem;
 }
 
 /* Responsive Design */
+@media (max-width: 1024px) {
+  .header-content {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .actions-section {
+    justify-content: space-between;
+  }
+  
+  .search-input {
+    width: 200px;
+  }
+}
+
 @media (max-width: 768px) {
-    .header {
-        flex-direction: column;
-        gap: 15px;
-        text-align: center;
-    }
-    
-    .stocks-table {
-        font-size: 14px;
-    }
-    
-    .stocks-table th,
-    .stocks-table td {
-        padding: 12px 8px;
-    }
-    
-    .view-btn, .add-btn, .remove-btn {
-        min-width: 90px;
-        padding: 8px 12px;
-        font-size: 13px;
-    }
-    
-    .symbol-info .symbol {
-        font-size: 16px;
-    }
+  .crypto-dashboard {
+    padding: 1rem;
+  }
+  
+  .header-section {
+    padding: 1.5rem;
+  }
+  
+  .main-title {
+    font-size: 2rem;
+  }
+  
+  .actions-section {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .search-input {
+    width: 100%;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+  }
+  
+  .symbols-table th,
+  .symbols-table td {
+    padding: 0.75rem;
+  }
+  
+  .watchlist-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

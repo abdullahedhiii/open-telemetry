@@ -377,7 +377,11 @@ func getAllCryptoSymbols(w http.ResponseWriter, r *http.Request) {
 	for _, coin := range cryptoData {
 		if symbol, ok := coin["symbol"].(string); ok {
 			if id, ok := coin["id"].(string); ok {
-				symbols = append(symbols, coinData{Symbol: symbol, Id: id})
+				if name, ok := coin["name"].(string); ok {
+					symbols = append(symbols, coinData{Symbol: symbol, Name: name, Id: id})
+				} else {
+					Logger.WarnContext(ctx, "Coin data missing 'name' field, skipping coin", "coin_symbol", symbol)
+				}
 			} else {
 				Logger.WarnContext(ctx, "Coin data missing 'id' field, skipping coin", "coin_symbol", symbol)
 			}
