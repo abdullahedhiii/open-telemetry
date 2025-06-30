@@ -107,6 +107,32 @@ func initTelemetry() (func(), error) {
 
 	meter := otel.Meter("stock-tracker-service")
 
+	loginAttempts, err = meter.Int64Counter(
+		"app_login_attempts",
+		metric.WithDescription("Total number of login attempts made by users."),
+		metric.WithUnit("{attempt}"),
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create app_login_attempts instrument: %w", err)
+	}
+
+	registerAttempts, err = meter.Int64Counter(
+		"app_register_attempts",
+		metric.WithDescription("Total number of user registration attempts."),
+		metric.WithUnit("{attempt}"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create app_register_attempts instrument: %w", err)
+	}
+	authDuration, err = meter.Float64Histogram(
+		"app_auth_duration",
+		metric.WithDescription("Duration of user authentication operations."),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create app_auth_duration instrument: %w", err)
+	}
 	httpRequestCount, err = meter.Int64Counter(
 		"app_http_request_count",
 		metric.WithDescription("Total number of successful HTTP requests handled by the application."),

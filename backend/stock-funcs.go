@@ -49,7 +49,8 @@ func getAllStockSymbols(w http.ResponseWriter, r *http.Request) {
 	httpRequestCount.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("endpoint", "/stocks/symbols"),
 		attribute.String("method", r.Method),
-	))
+		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
+		attribute.String("Span ID", span.SpanContext().SpanID().String())))
 
 	apiUrl := fmt.Sprintf("https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=%s", apiKey)
 
@@ -72,7 +73,8 @@ func getAllStockSymbols(w http.ResponseWriter, r *http.Request) {
 		attribute.String("api.name", "alphavantage_api"),
 		attribute.String("api.operation", "LISTING_STATUS"),
 		attribute.Bool("api.error", err != nil),
-	))
+		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
+		attribute.String("Span ID", apiCallSpan.SpanContext().SpanID().String())))
 
 	if err != nil {
 		apiCallSpan.SetStatus(codes.Error, fmt.Sprintf("HTTP GET failed: %v", err))
@@ -177,7 +179,8 @@ func getStockData(w http.ResponseWriter, r *http.Request) {
 	httpRequestCount.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("endpoint", "/stocks/{symbol}"),
 		attribute.String("method", r.Method),
-	))
+		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
+		attribute.String("Span ID", span.SpanContext().SpanID().String())))
 
 	_, apiCallSpan := tracer.Start(ctx, "alphaVantage.TIME_SERIES_DAILY")
 	apiCallSpan.SetAttributes(
@@ -200,7 +203,8 @@ func getStockData(w http.ResponseWriter, r *http.Request) {
 		attribute.String("api.name", "alphavantage_api"),
 		attribute.String("api.operation", "TIME_SERIES_DAILY"),
 		attribute.Bool("api.error", err != nil),
-	))
+		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
+		attribute.String("Span ID", apiCallSpan.SpanContext().SpanID().String())))
 
 	if err != nil {
 		apiCallSpan.SetStatus(codes.Error, fmt.Sprintf("HTTP GET failed: %v", err))
@@ -297,7 +301,8 @@ func getAllCryptoSymbols(w http.ResponseWriter, r *http.Request) {
 	httpRequestCount.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("endpoint", "/crypto/symbols"),
 		attribute.String("method", r.Method),
-	))
+		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
+		attribute.String("Span ID", span.SpanContext().SpanID().String())))
 
 	apiUrl := "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h"
 
@@ -321,7 +326,8 @@ func getAllCryptoSymbols(w http.ResponseWriter, r *http.Request) {
 		attribute.String("api.name", "coingecko_api"),
 		attribute.String("api.operation", "LISTED_COINS"),
 		attribute.Bool("api.error", err != nil),
-	))
+		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
+		attribute.String("Span ID", apiCallSpan.SpanContext().SpanID().String())))
 
 	if err != nil {
 		apiCallSpan.SetStatus(codes.Error, fmt.Sprintf("HTTP GET failed: %v", err))
@@ -432,7 +438,8 @@ func getCryptoData(w http.ResponseWriter, r *http.Request) {
 	httpRequestCount.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("endpoint", "/crypto/{symbol}"),
 		attribute.String("method", r.Method),
-	))
+		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
+		attribute.String("Span ID", span.SpanContext().SpanID().String())))
 
 	symbol := mux.Vars(r)["symbol"]
 	if symbol == "" {
@@ -466,7 +473,8 @@ func getCryptoData(w http.ResponseWriter, r *http.Request) {
 		attribute.String("api.name", "coingecko_api"),
 		attribute.String("api.operation", "LISTED_COINS"), // This might be COIN_DATA, depending on what metric name makes sense
 		attribute.Bool("api.error", err != nil),
-	))
+		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
+		attribute.String("Span ID", apiCallSpan.SpanContext().SpanID().String())))
 
 	if err != nil {
 		apiCallSpan.SetStatus(codes.Error, fmt.Sprintf("HTTP GET failed: %v", err))
@@ -538,6 +546,7 @@ func getCryptoData(w http.ResponseWriter, r *http.Request) {
 		Logger.InfoContext(ctx, "Crypto data retrieved and response sent", "symbol", symbol)
 	}
 }
+
 func addToWatchlist(w http.ResponseWriter, r *http.Request) {
 	tracer := otel.Tracer("stock-tracker-app-tracer")
 	ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
@@ -556,7 +565,8 @@ func addToWatchlist(w http.ResponseWriter, r *http.Request) {
 	httpRequestCount.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("endpoint", "/watchlist/add"),
 		attribute.String("method", r.Method),
-	))
+		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
+		attribute.String("Span ID", span.SpanContext().SpanID().String())))
 
 	var data struct {
 		Symbol   string `json:"symbol"`
@@ -630,12 +640,15 @@ func addToWatchlist(w http.ResponseWriter, r *http.Request) {
 	dbQueryCount.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("endpoint", "/watchlist/add"),
 		attribute.String("status", status),
-	))
+		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
+		attribute.String("Span ID", dbCallSpan.SpanContext().SpanID().String())))
+
 	dbQueryDuration.Record(ctx, dbCallDuration, metric.WithAttributes(
 		attribute.String("db.table", "UserSymbols"),
 		attribute.String("db.operation", "INSERT"),
 		attribute.Bool("db.error", err != nil),
-	))
+		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
+		attribute.String("Span ID", dbCallSpan.SpanContext().SpanID().String())))
 
 	if err != nil {
 		span.SetStatus(codes.Error, fmt.Sprintf("Watchlist insert failed: %v", err))
@@ -677,7 +690,8 @@ func getWatchlist(w http.ResponseWriter, r *http.Request) {
 	httpRequestCount.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("endpoint", "/watchlist/{userId}"),
 		attribute.String("method", r.Method),
-	))
+		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
+		attribute.String("Span ID", span.SpanContext().SpanID().String())))
 
 	userId := mux.Vars(r)["userId"]
 	if userId == "" {
@@ -717,12 +731,15 @@ func getWatchlist(w http.ResponseWriter, r *http.Request) {
 	dbQueryCount.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("endpoint", "/watchlist/{userId}"),
 		attribute.String("status", status),
-	))
+		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
+		attribute.String("Span ID", dbCallSpan.SpanContext().SpanID().String())))
+
 	dbQueryDuration.Record(ctx, dbCallDuration, metric.WithAttributes(
 		attribute.String("db.table", "UserSymbols"),
 		attribute.String("db.operation", "SELECT"),
 		attribute.Bool("db.error", err != nil),
-	))
+		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
+		attribute.String("Span ID", dbCallSpan.SpanContext().SpanID().String())))
 
 	if err != nil {
 		span.SetStatus(codes.Error, fmt.Sprintf("Failed to retrieve watchlist: %v", err))
@@ -766,7 +783,8 @@ func removeFromWatchlist(w http.ResponseWriter, r *http.Request) {
 	httpRequestCount.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("endpoint", "/watchlist/remove"),
 		attribute.String("method", r.Method),
-	))
+		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
+		attribute.String("Span ID", span.SpanContext().SpanID().String())))
 
 	userId := mux.Vars(r)["userId"]
 	symbol := mux.Vars(r)["symbol"]
@@ -806,12 +824,15 @@ func removeFromWatchlist(w http.ResponseWriter, r *http.Request) {
 	dbQueryCount.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("endpoint", "/watchlist/remove"),
 		attribute.String("status", status),
-	))
+		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
+		attribute.String("Span ID", dbCallSpan.SpanContext().SpanID().String())))
+
 	dbQueryDuration.Record(ctx, dbCallDuration, metric.WithAttributes(
 		attribute.String("db.table", "UserSymbols"),
 		attribute.String("db.operation", "DELETE"),
 		attribute.Bool("db.error", result.Error != nil),
-	))
+		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
+		attribute.String("Span ID", dbCallSpan.SpanContext().SpanID().String())))
 
 	w.Header().Set("Content-Type", "application/json")
 	if result.Error != nil {
