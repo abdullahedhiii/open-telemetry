@@ -11,12 +11,12 @@ data:
       evaluation_interval: 15s
 
     scrape_configs:
-      - job_name: 'stock-tracker'
-        static_configs:
-          - targets: ['backend-service:2222']
-        metrics_path: '/metrics'
-        scheme: 'http'
-        scrape_interval: 5s
+      # - job_name: 'stock-tracker'
+      #   static_configs:
+      #     - targets: ['backend-service:2222']
+      #   metrics_path: '/metrics'
+      #   scheme: 'http'
+      #   scrape_interval: 5s
 
       # - job_name: 'prometheus'
       #   static_configs:
@@ -29,6 +29,11 @@ data:
       - job_name: 'cadvisor'
         static_configs:
           - targets: ['cadvisor-service:8080']
+      
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+
 ---
 apiVersion: apps/v1
 kind: Deployment

@@ -538,17 +538,13 @@ func getCryptoData(w http.ResponseWriter, r *http.Request) {
 		Logger.InfoContext(ctx, "Crypto data retrieved and response sent", "symbol", symbol)
 	}
 }
-
 func addToWatchlist(w http.ResponseWriter, r *http.Request) {
 	tracer := otel.Tracer("stock-tracker-app-tracer")
 	ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
-
 	ctx, span := tracer.Start(ctx, "addToWatchList")
 	defer span.End()
-
 	r = r.WithContext(ctx)
 
-	// Log handler entry
 	Logger.InfoContext(ctx, "Handler execution started", "method", r.Method, "target", r.URL.Path)
 
 	span.SetAttributes(
@@ -564,7 +560,7 @@ func addToWatchlist(w http.ResponseWriter, r *http.Request) {
 
 	var data struct {
 		Symbol   string `json:"symbol"`
-		UserId   uint   `gorm:"not null;index"`
+		UserId   int    `json:"userId"` // ✅ updated from uint → int
 		Type     string `json:"type"`
 		CryptoId string `json:"cryptoId"`
 	}
@@ -572,63 +568,69 @@ func addToWatchlist(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
 		span.SetStatus(codes.Error, fmt.Sprintf("Failed to decode request body: %v", err))
 		span.RecordError(err)
-		// Log error for decoding request body
 		Logger.ErrorContext(ctx, "Failed to decode request body for add to watchlist", "error", err)
 		http.Error(w, "Failed to decode request body", http.StatusBadRequest)
 		return
 	}
-	Logger.InfoContext(ctx, "Request body decoded for watchlist add", "symbol", data.Symbol, "type", data.Type, "userId", data.UserId)
+
+	Logger.InfoContext(ctx, "Request body decoded", "symbol", data.Symbol, "type", data.Type, "userId", data.UserId)
 
 	_, dbCallSpan := tracer.Start(ctx, "db_call_addToList")
 	dbCallSpan.SetAttributes(
-		attribute.String("http.method", "GET"), // This should probably be "POST" or "INSERT" for database ops
 		attribute.String("db.table", "UserSymbols"),
 		attribute.String("db.operation", "INSERT"),
-		attribute.String("symbol_to_add", data.Symbol),
-		attribute.String("item_type", data.Type),
+		attribute.String("symbol", data.Symbol),
+		attribute.String("type", data.Type),
 	)
 	defer dbCallSpan.End()
 
 	var err error
-	var dbCallDuration float64
 	startTime := time.Now()
 
-	// Assuming UserSymbols and DB are defined elsewhere in main package
-	if data.Type == "STOCK" {
-		new_symbol := UserSymbols{Symbol: data.Symbol, UserID: data.UserId, Type: "STOCK", CryptoId: ""}
-		Logger.InfoContext(ctx, "Attempting to add stock to watchlist", "symbol", data.Symbol, "userId", data.UserId)
-		err = DB.Create(&new_symbol).Error
-		dbCallDuration = time.Since(startTime).Seconds()
-	} else if data.Type == "CRYPTO" {
-		new_symbol := UserSymbols{Symbol: data.Symbol, UserID: data.UserId, Type: "CRYPTO", CryptoId: data.CryptoId}
-		Logger.InfoContext(ctx, "Attempting to add crypto to watchlist", "symbol", data.Symbol, "cryptoId", data.CryptoId, "userId", data.UserId)
-		err = DB.Create(&new_symbol).Error
-		dbCallDuration = time.Since(startTime).Seconds()
-	} else {
-		span.SetStatus(codes.Error, fmt.Sprintf("Invalid item type for watchlist: %s", data.Type))
-		Logger.ErrorContext(ctx, "Invalid item type for watchlist", "type", data.Type)
-		http.Error(w, "Invalid item type", http.StatusBadRequest)
+	switch data.Type {
+	case "STOCK":
+		entry := UserSymbols{
+			Symbol:   data.Symbol,
+			UserID:   data.UserId,
+			Type:     "STOCK",
+			CryptoId: "",
+		}
+		Logger.InfoContext(ctx, "Inserting stock watchlist item", "symbol", data.Symbol, "userId", data.UserId)
+		err = DB.Create(&entry).Error
+
+	case "CRYPTO":
+		entry := UserSymbols{
+			Symbol:   data.Symbol,
+			UserID:   data.UserId,
+			Type:     "CRYPTO",
+			CryptoId: data.CryptoId,
+		}
+		Logger.InfoContext(ctx, "Inserting crypto watchlist item", "symbol", data.Symbol, "cryptoId", data.CryptoId, "userId", data.UserId)
+		err = DB.Create(&entry).Error
+
+	default:
+		span.SetStatus(codes.Error, fmt.Sprintf("Invalid type: %s", data.Type))
+		Logger.ErrorContext(ctx, "Invalid watchlist item type", "type", data.Type)
+		http.Error(w, "Invalid type (must be STOCK or CRYPTO)", http.StatusBadRequest)
 		return
 	}
 
-	var status string
+	dbCallDuration := time.Since(startTime).Seconds()
+	status := "success"
 	if err != nil {
 		status = "failure"
-		dbCallSpan.SetStatus(codes.Error, fmt.Sprintf("Database insert failed: %v", err))
+		dbCallSpan.SetStatus(codes.Error, fmt.Sprintf("DB insert failed: %v", err))
 		dbCallSpan.RecordError(err)
-		Logger.ErrorContext(ctx, "Failed to add item to watchlist in database", "error", err, "symbol", data.Symbol, "userId", data.UserId, "type", data.Type)
-
+		Logger.ErrorContext(ctx, "DB insert failed", "error", err, "symbol", data.Symbol, "userId", data.UserId)
 	} else {
-		status = "success"
-		dbCallSpan.SetStatus(codes.Ok, "Database insert successful")
-		Logger.InfoContext(ctx, "Successfully added item to watchlist in database", "symbol", data.Symbol, "userId", data.UserId, "type", data.Type)
+		dbCallSpan.SetStatus(codes.Ok, "DB insert successful")
+		Logger.InfoContext(ctx, "Watchlist item inserted", "symbol", data.Symbol, "userId", data.UserId)
 	}
 
 	dbQueryCount.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("endpoint", "/watchlist/add"),
 		attribute.String("status", status),
 	))
-
 	dbQueryDuration.Record(ctx, dbCallDuration, metric.WithAttributes(
 		attribute.String("db.table", "UserSymbols"),
 		attribute.String("db.operation", "INSERT"),
@@ -636,26 +638,24 @@ func addToWatchlist(w http.ResponseWriter, r *http.Request) {
 	))
 
 	if err != nil {
-		span.SetStatus(codes.Error, fmt.Sprintf("Failed to create watch list item: %v", err))
+		span.SetStatus(codes.Error, fmt.Sprintf("Watchlist insert failed: %v", err))
 		span.RecordError(err)
-		http.Error(w, "Failed to create watchlist item", http.StatusInternalServerError)
+		http.Error(w, "Failed to add item to watchlist", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	err = json.NewEncoder(w).Encode(data)
-	if err != nil {
-		span.SetStatus(codes.Error, fmt.Sprintf("Failed to encode JSON response: %v", err))
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		span.SetStatus(codes.Error, fmt.Sprintf("Response encoding failed: %v", err))
 		span.RecordError(err)
-		// Log error for JSON encoding
-		Logger.ErrorContext(ctx, "Failed to encode JSON response for add to watchlist", "error", err, "symbol", data.Symbol, "userId", data.UserId)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		Logger.ErrorContext(ctx, "Response encoding failed", "error", err)
+		http.Error(w, "Failed to write response", http.StatusInternalServerError)
 		return
-	} else {
-		span.SetStatus(codes.Ok, "Watch list item added successfully")
-		span.AddEvent("Response sent")
-		Logger.InfoContext(ctx, "Watchlist item added and response sent", "symbol", data.Symbol, "userId", data.UserId)
 	}
+
+	span.SetStatus(codes.Ok, "Watchlist item added successfully")
+	span.AddEvent("Response sent")
+	Logger.InfoContext(ctx, "Watchlist item added and response sent", "symbol", data.Symbol, "userId", data.UserId)
 }
 
 func getWatchlist(w http.ResponseWriter, r *http.Request) {

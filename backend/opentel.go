@@ -5,15 +5,14 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"net/http"
 	"os"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
+
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
-	otelprometheus "go.opentelemetry.io/otel/exporters/prometheus"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
@@ -35,7 +34,6 @@ var (
 )
 
 var (
-	metricsServer  *http.Server
 	tracerProvider *trace.TracerProvider
 	meterProvider  *sdkmetric.MeterProvider
 	Logger         *slog.Logger
@@ -62,7 +60,7 @@ func initTelemetry() (func(), error) {
 	res, err := resource.Merge(
 		resource.Default(),
 		resource.NewWithAttributes(
-			semconv.SchemaURL,
+			"",
 			semconv.ServiceNameKey.String("stock-tracker-service"),
 			semconv.ServiceVersionKey.String("0.1.0"),
 			attribute.String("environment", "development"),
@@ -92,14 +90,18 @@ func initTelemetry() (func(), error) {
 
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 
-	promExporter, err := otelprometheus.New()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Prometheus exporter: %w", err)
-	}
-
+	// promExporter, err := otelprometheus.New()
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to create Prometheus exporter: %w", err)
+	// }
+	metricExporter, err := otlpmetrichttp.New(ctx,
+		otlpmetrichttp.WithEndpoint("otel-collector-service:4318"),
+		otlpmetrichttp.WithInsecure(),
+		otlpmetrichttp.WithURLPath("/v1/metrics"),
+	)
 	meterProvider = sdkmetric.NewMeterProvider(
+		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricExporter)),
 		sdkmetric.WithResource(res),
-		sdkmetric.WithReader(promExporter),
 	)
 	otel.SetMeterProvider(meterProvider)
 
@@ -161,22 +163,22 @@ func initTelemetry() (func(), error) {
 	}
 	log.Println("Application metrics instruments initialized.")
 
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler())
+	// mux := http.NewServeMux()
+	// mux.Handle("/metrics", promhttp.Handler())
 
-	metricsServer = &http.Server{
-		Addr:    ":2222",
-		Handler: mux,
-	}
+	// metricsServer = &http.Server{
+	// 	Addr:    ":2222",
+	// 	Handler: mux,
+	// }
 
-	go func() {
-		log.Printf("Prometheus metrics endpoint starting at %s/metrics", metricsServer.Addr)
-		if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("Prometheus HTTP server error: %v", err)
-		}
-	}()
+	// go func() {
+	// 	log.Printf("Prometheus metrics endpoint starting at %s/metrics", metricsServer.Addr)
+	// 	if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	// 		log.Printf("Prometheus HTTP server error: %v", err)
+	// 	}
+	// }()
 
-	log.Println("OpenTelemetry initialization complete. Traces go to OTLP, Metrics go to Prometheus endpoint.")
+	log.Println("OpenTelemetry initialization complete. Traces and metrics are exported via OTLP to the Collector.")
 
 	return func() {
 
@@ -197,12 +199,12 @@ func initTelemetry() (func(), error) {
 			}
 		}
 
-		if metricsServer != nil {
-			log.Println("Shutting down Prometheus metrics server...")
-			if err := metricsServer.Shutdown(shutdownCtx); err != nil {
-				log.Printf("Error shutting down metrics server: %v", err)
-			}
-		}
+		// if metricsServer != nil {
+		// 	log.Println("Shutting down Prometheus metrics server...")
+		// 	if err := metricsServer.Shutdown(shutdownCtx); err != nil {
+		// 		log.Printf("Error shutting down metrics server: %v", err)
+		// 	}
+		// }
 
 		log.Println("OpenTelemetry shutdown completed.")
 	}, nil

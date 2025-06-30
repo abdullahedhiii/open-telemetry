@@ -51,7 +51,7 @@ data:
           exporters: [otlp,logging]
 
         metrics:
-          receivers: [hostmetrics]
+          receivers: [otlp,hostmetrics]
           processors: [batch]
           exporters: [prometheus]
 
