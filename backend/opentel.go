@@ -29,6 +29,9 @@ var (
 	externalAPICallDuration metric.Float64Histogram
 	dbQueryCount            metric.Int64Counter
 	dbQueryDuration         metric.Float64Histogram
+	loginAttempts           metric.Int64Counter
+	registerAttempts        metric.Int64Counter
+	authDuration            metric.Float64Histogram
 )
 
 var (
@@ -49,8 +52,12 @@ func initTelemetry() (func(), error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open log file: %w", err)
 	}
-	Logger = slog.New(slog.NewJSONHandler(logFile, nil))
-	Logger.Info("Logger initialized", "service", "otel-backend")
+	baseHandler := slog.NewJSONHandler(logFile, nil)
+	otelHandler := NewOtelHandler(baseHandler)
+	Logger = slog.New(otelHandler)
+	// Logger = slog.New(slog.NewJSONHandler(logFile, nil))
+
+	Logger.InfoContext(context.TODO(), "Logger initialized", "service", "otel-backend")
 
 	res, err := resource.Merge(
 		resource.Default(),

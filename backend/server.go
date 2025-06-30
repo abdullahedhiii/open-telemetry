@@ -43,6 +43,8 @@ func main() {
 	defer CloseDB()
 	fmt.Println("Database initialized")
 
+	router.HandleFunc("/users/login", loginUser).Methods("POST")
+	router.HandleFunc("/users/register", registerUser).Methods("POST")
 	router.HandleFunc("/stocks/symbols", getAllStockSymbols).Methods("GET")
 	router.HandleFunc("/stocks/{symbol}", getStockData).Methods("GET")
 	router.HandleFunc("/crypto/symbols", getAllCryptoSymbols).Methods("GET")

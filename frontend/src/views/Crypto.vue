@@ -43,9 +43,8 @@ async function fetchSymbols() {
       'api.endpoint': '/crypto/symbols'
     })
     
-    // Create a child span for the actual HTTP request
     const httpSpan = tracer.startSpan('http_request', {
-      parent: ctx,
+      parent: trace.setSpan(context.active(), mainSpan),
       attributes: {
         'http.url': fullUrl,
         'http.method': 'GET'
@@ -74,9 +73,8 @@ async function fetchSymbols() {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
     
-    // Create span for data processing
     const processingSpan = tracer.startSpan('process_response_data', {
-      parent: ctx
+       parent: trace.setSpan(context.active(), httpSpan),
     })
     
     const data = await response.json()

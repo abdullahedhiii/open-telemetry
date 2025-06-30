@@ -34,7 +34,11 @@ func getAllStockSymbols(w http.ResponseWriter, r *http.Request) {
 
 	r = r.WithContext(ctx)
 
-	Logger.InfoContext(ctx, "Handler execution started", "method", r.Method, "target", r.URL.Path)
+	Logger.InfoContext(ctx,
+		"Handler execution started",
+		"method", r.Method,
+		"target", r.URL.Path,
+	)
 
 	span.SetAttributes(
 		attribute.String("http.method", r.Method),
@@ -410,7 +414,8 @@ func getAllCryptoSymbols(w http.ResponseWriter, r *http.Request) {
 
 func getCryptoData(w http.ResponseWriter, r *http.Request) {
 	tracer := otel.Tracer("stock-tracker-app-tracer")
-	ctx, span := tracer.Start(r.Context(), "getCoinDataFromSymbol")
+	ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
+	ctx, span := tracer.Start(ctx, "getCoinDataFromSymbol")
 	defer span.End()
 
 	r = r.WithContext(ctx)
@@ -536,7 +541,9 @@ func getCryptoData(w http.ResponseWriter, r *http.Request) {
 
 func addToWatchlist(w http.ResponseWriter, r *http.Request) {
 	tracer := otel.Tracer("stock-tracker-app-tracer")
-	ctx, span := tracer.Start(r.Context(), "addToWatchList")
+	ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
+
+	ctx, span := tracer.Start(ctx, "addToWatchList")
 	defer span.End()
 
 	r = r.WithContext(ctx)
@@ -557,7 +564,7 @@ func addToWatchlist(w http.ResponseWriter, r *http.Request) {
 
 	var data struct {
 		Symbol   string `json:"symbol"`
-		UserId   string `json:"userId"`
+		UserId   uint   `gorm:"not null;index"`
 		Type     string `json:"type"`
 		CryptoId string `json:"cryptoId"`
 	}
@@ -577,7 +584,6 @@ func addToWatchlist(w http.ResponseWriter, r *http.Request) {
 		attribute.String("http.method", "GET"), // This should probably be "POST" or "INSERT" for database ops
 		attribute.String("db.table", "UserSymbols"),
 		attribute.String("db.operation", "INSERT"),
-		attribute.String("user_id", data.UserId),
 		attribute.String("symbol_to_add", data.Symbol),
 		attribute.String("item_type", data.Type),
 	)
@@ -589,12 +595,12 @@ func addToWatchlist(w http.ResponseWriter, r *http.Request) {
 
 	// Assuming UserSymbols and DB are defined elsewhere in main package
 	if data.Type == "STOCK" {
-		new_symbol := UserSymbols{Symbol: data.Symbol, UserId: data.UserId, Type: "STOCK", CryptoId: ""}
+		new_symbol := UserSymbols{Symbol: data.Symbol, UserID: data.UserId, Type: "STOCK", CryptoId: ""}
 		Logger.InfoContext(ctx, "Attempting to add stock to watchlist", "symbol", data.Symbol, "userId", data.UserId)
 		err = DB.Create(&new_symbol).Error
 		dbCallDuration = time.Since(startTime).Seconds()
 	} else if data.Type == "CRYPTO" {
-		new_symbol := UserSymbols{Symbol: data.Symbol, UserId: data.UserId, Type: "CRYPTO", CryptoId: data.CryptoId}
+		new_symbol := UserSymbols{Symbol: data.Symbol, UserID: data.UserId, Type: "CRYPTO", CryptoId: data.CryptoId}
 		Logger.InfoContext(ctx, "Attempting to add crypto to watchlist", "symbol", data.Symbol, "cryptoId", data.CryptoId, "userId", data.UserId)
 		err = DB.Create(&new_symbol).Error
 		dbCallDuration = time.Since(startTime).Seconds()
@@ -654,7 +660,8 @@ func addToWatchlist(w http.ResponseWriter, r *http.Request) {
 
 func getWatchlist(w http.ResponseWriter, r *http.Request) {
 	tracer := otel.Tracer("stock-tracker-app-tracer")
-	ctx, span := tracer.Start(r.Context(), "getWatchlistHandler")
+	ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
+	ctx, span := tracer.Start(ctx, "getWatchlistHandler")
 	defer span.End()
 
 	r = r.WithContext(ctx)
@@ -742,7 +749,9 @@ func getWatchlist(w http.ResponseWriter, r *http.Request) {
 
 func removeFromWatchlist(w http.ResponseWriter, r *http.Request) {
 	tracer := otel.Tracer("stock-tracker-app-tracer")
-	ctx, span := tracer.Start(r.Context(), "removeFromWatchlistHandler")
+	ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
+
+	ctx, span := tracer.Start(ctx, "removeFromWatchlistHandler")
 	defer span.End()
 
 	r = r.WithContext(ctx)

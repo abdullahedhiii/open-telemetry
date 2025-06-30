@@ -12,7 +12,6 @@ const sortOrder = ref('asc')
 const selectedItems = ref([])
 const showBulkActions = ref(false)
 
-// Enhanced computed properties with tracing
 const filteredAndSortedWatchlist = computed(() => {
   const span = tracer.startSpan('filter_and_sort_watchlist', {
     attributes: {
@@ -26,7 +25,6 @@ const filteredAndSortedWatchlist = computed(() => {
   try {
     let filtered = watchlistItems.value
     
-    // Filter by search query
     if (searchQuery.value.trim()) {
       filtered = watchlistItems.value.filter(item => 
         item.symbol?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
@@ -35,7 +33,6 @@ const filteredAndSortedWatchlist = computed(() => {
       )
     }
     
-    // Sort the results
     filtered.sort((a, b) => {
       let aValue, bValue
       
@@ -89,7 +86,6 @@ const filteredAndSortedWatchlist = computed(() => {
 const stockItems = computed(() => filteredAndSortedWatchlist.value.filter(item => item.type === 'stock'))
 const cryptoItems = computed(() => filteredAndSortedWatchlist.value.filter(item => item.type === 'crypto'))
 
-// Load watchlist data with enhanced tracing
 async function loadWatchlist() {
   const span = tracer.startSpan('load_watchlist_data', {
     attributes: {
@@ -98,31 +94,41 @@ async function loadWatchlist() {
       'data.source': 'localStorage_and_api'
     }
   })
-  
+  const ctx = trace.setSpan(context.active(), span)
+
   try {
     loading.value = true
     error.value = null
     
     const startTime = performance.now()
+    const headers = {}
+    propagation.inject(ctx, headers)
+    headers['Content-Type'] = 'application/json'
     
     // Load from localStorage first
-    const localStorageSpan = tracer.startSpan('load_from_localStorage', {
+    const dbSpan = tracer.startSpan('get_watchlist_request', {
       parent: span
     })
     
-    const savedWatchlist = localStorage.getItem('userWatchlist')
+    const savedWatchlist = await fetch(`${import.meta.env.VITE_API_URL}/watchlist/U-11`, {
+      method: 'GET',
+      headers: headers
+    }).then(res => res.json()).catch(err => {
+      dbSpan.setStatus({ code: 2, message: err.message })
+      throw new Error('Failed to load watchlist from localStorage')
+    })
     let localItems = []
     
     if (savedWatchlist) {
       localItems = JSON.parse(savedWatchlist)
-      localStorageSpan.setAttributes({
-        'localStorage.items_found': localItems.length,
-        'localStorage.data_size_bytes': savedWatchlist.length
+      dbSpan.setAttributes({
+        'db.items_found': localItems.length,
+        'db.data_size_bytes': savedWatchlist.length
       })
     }
     
-    localStorageSpan.setStatus({ code: 1 })
-    localStorageSpan.end()
+    dbSpan.setStatus({ code: 1 })
+    dbSpan.end()
     
     // Simulate API call to get additional details
     const apiSpan = tracer.startSpan('fetch_watchlist_details', {

@@ -20,16 +20,28 @@ import (
 
 var DB *gorm.DB
 
+type User struct {
+	gorm.Model
+	Username string `gorm:"size:100;not null;unique"`
+	Email    string `gorm:"size:200;not null;unique"`
+	Password string `gorm:"size:200;not null"`
+}
+
 type UserSymbols struct {
 	gorm.Model
 	Symbol   string `gorm:"size:100;not null;index"`
-	UserId   string `gorm:"size:200;not null;index"`
+	UserID   uint   `gorm:"not null;index"`
+	User     User   `gorm:"foreignKey:UserID"`
 	Type     string `gorm:"size:50;not null;check:type IN ('STOCK', 'CRYPTO')"`
 	CryptoId string `gorm:"size:200;default:null"`
 }
 
 func (UserSymbols) TableName() string {
 	return "user_symbols"
+}
+
+func (User) TableName() string {
+	return "users"
 }
 
 func initDB() error {
@@ -165,12 +177,8 @@ func initDB() error {
 	DB.Callback().Delete().After("gorm:after_delete").Register("delete_metrics", recordGormMetricsAndSpanStatus)
 	DB.Callback().Raw().After("gorm:after_raw").Register("raw_metrics", recordGormMetricsAndSpanStatus)
 
-	if err := DB.AutoMigrate(&UserSymbols{}); err != nil {
+	if err := DB.AutoMigrate(&UserSymbols{}, &User{}); err != nil {
 		return fmt.Errorf("error migrating database: %w", err)
-	}
-
-	if err := DB.Exec("CREATE INDEX IF NOT EXISTS idx_user_symbols_user_type ON user_symbols(user_id, type)").Error; err != nil {
-		log.Printf("Warning: Could not create composite index: %v", err)
 	}
 
 	fmt.Println("Database connected and instrumented successfully")

@@ -10,7 +10,6 @@ const error = ref(null)
 const detailsData = ref(null)
 const isInWatchlist = ref(false)
 
-// Computed properties for data type detection
 const dataType = computed(() => {
   return type.value === 'stocks' ? 'stocks' : 'crypto'
 })
@@ -66,7 +65,6 @@ const limitedTimeSeriesData = computed(() => {
   return Object.fromEntries(limitedEntries)
 })
 
-// Utility functions
 function formatNumber(num) {
   if (!num) return '0'
   const number = parseFloat(num)
@@ -99,15 +97,21 @@ async function fetchData() {
       'component': 'details_page'
     }
   });
-
+  const ctx = trace.setSpan(context.active(), span)
   try {
-   
+
     loading.value = true;
     error.value = null;
 
+    const headers = {}
+    propagation.inject(ctx, headers)
+    headers['Content-Type'] = 'application/json'
+    
     const detailsSpan = tracer.startSpan('fetch_symbol_data', { parent: span });
     
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/${type.value}/${symbol.value}`);
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/${type.value}/${symbol.value}`,{
+      headers: headers
+    });
 
     if (!response.ok) {
       throw new Error(`Failed to fetch details: ${response.statusText}`);

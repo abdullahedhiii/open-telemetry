@@ -99,7 +99,7 @@ async function fetchSymbols() {
     
     // Create child span for HTTP request
     const httpSpan = tracer.startSpan('http_request_stocks', {
-      parent: ctx,
+      parent: trace.setSpan(context.active(), mainSpan),
       attributes: {
         'http.url': fullUrl,
         'http.method': 'GET',
@@ -132,7 +132,7 @@ async function fetchSymbols() {
     
     // Data processing span
     const processingSpan = tracer.startSpan('process_stock_data', {
-      parent: ctx,
+      parent: trace.setSpan(context.active(), httpSpan),
       attributes: {
         'processing.type': 'json_parse_and_validate'
       }
