@@ -22,9 +22,8 @@ import (
 )
 
 var (
-	httpRequestCount        metric.Int64Counter
-	watchlistAddAttempts    metric.Int64Counter
-	watchlistFailedAddCount metric.Int64Counter
+	httpRequestCount metric.Int64Counter
+	// watchlistAddAttempts    metric.Int64Counter
 	externalAPICallDuration metric.Float64Histogram
 	dbQueryCount            metric.Int64Counter
 	dbQueryDuration         metric.Float64Histogram
@@ -158,24 +157,6 @@ func initTelemetry() (func(), error) {
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create app.db.query_duration instrument: %w", err)
-	}
-
-	watchlistAddAttempts, err = meter.Int64Counter(
-		"app_watchlist_add_attempts",
-		metric.WithDescription("Total attempts to add an item to the watchlist."),
-		metric.WithUnit("{attempt}"),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create app.watchlist.add_attempts instrument: %w", err)
-	}
-
-	watchlistFailedAddCount, err = meter.Int64Counter(
-		"app_watchlist_failed_add_count",
-		metric.WithDescription("Number of failed attempts to add an item to the watchlist."),
-		metric.WithUnit("{failure}"),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create app.watchlist.failed_add_count instrument: %w", err)
 	}
 
 	externalAPICallDuration, err = meter.Float64Histogram(
