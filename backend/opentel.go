@@ -94,7 +94,7 @@ func initTelemetry() (func(), error) {
 	// if err != nil {
 	// 	return nil, fmt.Errorf("failed to create Prometheus exporter: %w", err)
 	// }
-	metricExporter, err := otlpmetrichttp.New(ctx,
+	metricExporter, _ := otlpmetrichttp.New(ctx,
 		otlpmetrichttp.WithEndpoint("otel-collector-service:4318"),
 		otlpmetrichttp.WithInsecure(),
 		otlpmetrichttp.WithURLPath("/v1/metrics"),

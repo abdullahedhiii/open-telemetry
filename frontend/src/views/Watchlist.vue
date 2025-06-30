@@ -94,6 +94,9 @@ async function loadWatchlist() {
       'data.source': 'localStorage_and_api'
     }
   })
+  const data= JSON.parse(localStorage.getItem("userData"))
+
+  // console.log(data,data.ID);
   const ctx = trace.setSpan(context.active(), span)
 
   try {
@@ -105,12 +108,12 @@ async function loadWatchlist() {
     propagation.inject(ctx, headers)
     headers['Content-Type'] = 'application/json'
     
-    // Load from localStorage first
+    
     const dbSpan = tracer.startSpan('get_watchlist_request', {
       parent: span
     })
     
-    const savedWatchlist = await fetch(`${import.meta.env.VITE_API_URL}/watchlist/U-11`, {
+    const savedWatchlist = await fetch(`${import.meta.env.VITE_API_URL}/watchlist/${data.ID}`, {
       method: 'GET',
       headers: headers
     }).then(res => res.json()).catch(err => {
@@ -130,7 +133,7 @@ async function loadWatchlist() {
     dbSpan.setStatus({ code: 1 })
     dbSpan.end()
     
-    // Simulate API call to get additional details
+    
     const apiSpan = tracer.startSpan('fetch_watchlist_details', {
       parent: span,
       attributes: {
@@ -139,7 +142,7 @@ async function loadWatchlist() {
       }
     })
     
-    // Mock API call - in real app, this would fetch current prices, etc.
+    
     await new Promise(resolve => setTimeout(resolve, 500))
     
     const enrichedItems = localItems.map(item => ({
@@ -204,7 +207,7 @@ function removeFromWatchlist(symbol) {
     if (index > -1) {
       const removedItem = watchlistItems.value.splice(index, 1)[0]
       
-      // Update localStorage
+      
       localStorage.setItem('userWatchlist', JSON.stringify(
         watchlistItems.value.map(item => ({
           symbol: item.symbol,
@@ -277,7 +280,7 @@ function removeSelectedItems() {
       item => !selectedItems.value.includes(item.symbol)
     )
     
-    // Update localStorage
+    
     localStorage.setItem('userWatchlist', JSON.stringify(
       watchlistItems.value.map(item => ({
         symbol: item.symbol,
@@ -344,7 +347,7 @@ function viewDetails(symbol, type) {
   })
   
   try {
-    // In a real app, this would use Vue Router
+    
     const detailsUrl = `/details?symbol=${symbol}&type=${type}`
     
     span.setAttributes({
@@ -393,7 +396,7 @@ function updateSort(field) {
   }
 }
 
-// Component lifecycle
+
 onMounted(() => {
   const span = tracer.startSpan('watchlist_page_mounted', {
     attributes: {

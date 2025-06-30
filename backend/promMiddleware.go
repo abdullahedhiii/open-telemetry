@@ -18,7 +18,6 @@ var (
 	httpResponseSize    metric.Float64Histogram
 )
 
-// InitHTTPMetrics initializes all HTTP metrics instruments
 func InitHTTPMetrics() error {
 	meter := otel.Meter("stock-tracker-service/http")
 

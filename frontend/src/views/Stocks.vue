@@ -11,6 +11,86 @@ const searchQuery = ref('')
 const sortBy = ref('symbol')
 const sortOrder = ref('asc')
 
+async function fetchWatchlist() {
+  const userId = JSON.parse(localStorage.getItem("userData")).ID
+  const mainSpan = tracer.startSpan('fetch_user_watchlist', {
+    attributes: {
+      'operation': 'fetch_watchlist',
+      'watchlist.user_id': userId,
+      'component': 'watchlist_service',
+      'page.context': 'dashboard'
+    }
+  })
+
+  const ctx = trace.setSpan(context.active(), mainSpan)
+  const headers = {}
+  propagation.inject(ctx, headers)
+
+  try {
+    const apiUrl = import.meta.env.VITE_API_URL
+    const fullUrl = `${apiUrl}/watchlist/${userId}`
+
+    mainSpan.setAttribute('http.url', fullUrl)
+
+    const httpSpan = tracer.startSpan('http_request_watchlist', {
+      parent: mainSpan,
+      attributes: {
+        'http.method': 'GET',
+        'http.url': fullUrl,
+        'user.agent': navigator.userAgent
+      }
+    })
+
+    const response = await fetch(fullUrl, {
+      method: 'GET',
+      headers
+    })
+
+    httpSpan.setAttribute('http.status_code', response.status)
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+
+    const processingSpan = tracer.startSpan('process_watchlist_data', {
+      parent: httpSpan,
+      attributes: {
+        'processing.type': 'json_decode'
+      }
+    })
+
+    const result = await response.json()
+    const items = Array.isArray(result) ? result : result.watchlist || []
+
+    watchlist.value = items.filter(item => item.Type == 'STOCK').map(item=> item.Symbol)
+
+    processingSpan.setAttributes({
+      'watchlist.items_total': items.length
+    })
+    processingSpan.setStatus({ code: 1 })
+    processingSpan.end()
+
+    httpSpan.setStatus({ code: 1 })
+    httpSpan.end()
+
+    mainSpan.setAttributes({
+      'watchlist.items_count': watchlist.value.length,
+      'operation.success': true
+    })
+    mainSpan.setStatus({ code: 1 })
+
+  } catch (err) {
+    console.error("Error fetching watchlist:", err)
+    mainSpan.setAttributes({
+      'error.message': err.message,
+      'operation.success': false
+    })
+    mainSpan.setStatus({ code: 2, message: err.message })
+  } finally {
+    mainSpan.end()
+  }
+}
+
 const filteredAndSortedSymbols = computed(() => {
   const span = tracer.startSpan('filter_and_sort_stocks', {
     attributes: {
@@ -24,7 +104,6 @@ const filteredAndSortedSymbols = computed(() => {
   try {
     let filtered = symbols.value
     
-    // Filter by search query
     if (searchQuery.value.trim()) {
       filtered = symbols.value.filter(stock => 
         stock.Symbol?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
@@ -32,7 +111,6 @@ const filteredAndSortedSymbols = computed(() => {
       )
     }
     
-    // Sort the results
     filtered.sort((a, b) => {
       let aValue = sortBy.value === 'symbol' ? a.Symbol : a.Name || ''
       let bValue = sortBy.value === 'symbol' ? b.Symbol : b.Name || ''
@@ -79,7 +157,7 @@ async function fetchSymbols() {
     error.value = null
     loading.value = true
     
-    // Performance tracking
+    
     const startTime = performance.now()
     mainSpan.setAttribute('fetch.start_time', startTime)
     
@@ -97,7 +175,7 @@ async function fetchSymbols() {
       'api.version': 'v1'
     })
     
-    // Create child span for HTTP request
+    
     const httpSpan = tracer.startSpan('http_request_stocks', {
       parent: trace.setSpan(context.active(), mainSpan),
       attributes: {
@@ -130,7 +208,7 @@ async function fetchSymbols() {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
     
-    // Data processing span
+    
     const processingSpan = tracer.startSpan('process_stock_data', {
       parent: trace.setSpan(context.active(), httpSpan),
       attributes: {
@@ -141,7 +219,7 @@ async function fetchSymbols() {
     const data = await response.json()
     const processedSymbols = Array.isArray(data) ? data : data.symbols || []
     
-    // Validate data structure
+    
     const validSymbols = processedSymbols.filter(stock => stock.Symbol)
     
     processingSpan.setAttributes({
@@ -201,7 +279,7 @@ function viewDetails(symbol, name) {
       'user.intent': 'view_stock_information'
     })
     
-    // Enhanced user interaction - could be replaced with actual navigation
+    
     window.location = '/details/stocks/' + symbol
     
     span.setAttributes({
@@ -220,90 +298,109 @@ function viewDetails(symbol, name) {
   }
 }
 
-function addToWatchlist(symbol) {
-  const span = tracer.startSpan('add_stock_to_watchlist', {
+async function addToWatchlist(symbol) {
+  const span = tracer.startSpan('add_crypto_to_watchlist', {
     attributes: {
       'stock.symbol': symbol,
       'user.action': 'add_watchlist',
-      'watchlist.size_before': watchlist.value.length,
       'interaction.type': 'add_item'
     }
   })
-  
+
   try {
-    if (!watchlist.value.includes(symbol)) {
-      watchlist.value.push(symbol)
-      
-      span.setAttributes({
-        'watchlist.size_after': watchlist.value.length,
-        'operation.success': true,
-        'watchlist.action': 'added',
-        'watchlist.growth': 1
-      })
-      
-      // Track watchlist analytics
-      const analyticsSpan = tracer.startSpan('watchlist_analytics', {
-        parent: span,
-        attributes: {
-          'analytics.event': 'watchlist_item_added',
-          'analytics.item_type': 'stock',
-          'analytics.list_size': watchlist.value.length
-        }
-      })
-      analyticsSpan.setStatus({ code: 1 })
-      analyticsSpan.end()
-      
-    } else {
-      span.setAttributes({
-        'operation.success': false,
-        'error.reason': 'symbol_already_exists',
-        'watchlist.duplicate_attempt': true
-      })
+    const userData = localStorage.getItem("userData")
+    if (!userData) {
+      throw new Error("User not logged in")
     }
-    
+
+    const parsedUser = JSON.parse(userData)
+    const userId = parsedUser.ID 
+
+    const apiUrl = import.meta.env.VITE_API_URL
+    const endpoint = `${apiUrl}/watchlist/add`
+
+    const payload = {
+      UserID: userId,
+      Type: "STOCK",
+      Symbol: symbol,
+      CryptoId: null
+    }
+
+    const headers = {}
+    const ctx = trace.setSpan(context.active(), span)
+    propagation.inject(ctx, headers)
+
+    headers['Content-Type'] = 'application/json'
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    })
+
+    span.setAttributes({
+      'http.status_code': response.status,
+      'watchlist.symbol': symbol
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to add to watchlist: ${response.statusText}`)
+    }
+
     span.setStatus({ code: 1 })
   } catch (err) {
+    console.error("Error adding to watchlist:", err)
     span.setAttributes({
-      'error.message': err.message,
-      'operation.success': false
+      'operation.success': false,
+      'error.message': err.message
     })
     span.setStatus({ code: 2, message: err.message })
   } finally {
     span.end()
   }
 }
-
-function removeFromWatchlist(symbol) {
+async function removeFromWatchlist(symbol) {
   const span = tracer.startSpan('remove_stock_from_watchlist', {
     attributes: {
       'stock.symbol': symbol,
       'user.action': 'remove_watchlist',
-      'watchlist.size_before': watchlist.value.length,
       'interaction.type': 'remove_item'
     }
   })
-  
+
   try {
-    const index = watchlist.value.indexOf(symbol)
-    if (index > -1) {
-      watchlist.value.splice(index, 1)
-      
-      span.setAttributes({
-        'watchlist.size_after': watchlist.value.length,
-        'operation.success': true,
-        'watchlist.action': 'removed',
-        'watchlist.reduction': 1,
-        'removed.index': index
-      })
-    } else {
-      span.setAttributes({
-        'operation.success': false,
-        'error.reason': 'symbol_not_found'
-      })
+    const userData = localStorage.getItem("userData")
+    if (!userData) {
+      throw new Error("User not logged in")
     }
-    
+
+    const parsedUser = JSON.parse(userData)
+    const userId = parsedUser.ID 
+
+    const apiUrl = import.meta.env.VITE_API_URL
+    const endpoint = `${apiUrl}/watchlist/remove/stock/${userId}/${symbol}`
+
+    const headers = {}
+    const ctx = trace.setSpan(context.active(), span)
+    propagation.inject(ctx, headers)
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers
+    })
+
+    span.setAttributes({
+      'http.status_code': response.status,
+      'watchlist.symbol': symbol
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to remove from watchlist: ${response.statusText}`)
+    }
+
     span.setStatus({ code: 1 })
   } catch (err) {
+    console.error("Error removing from watchlist:", err)
     span.setAttributes({
       'error.message': err.message,
       'operation.success': false
@@ -358,7 +455,7 @@ onMounted(() => {
       'user.agent': navigator.userAgent
     }
   })
-  
+  fetchWatchlist()
   span.setStatus({ code: 1 })
   span.end()
 })

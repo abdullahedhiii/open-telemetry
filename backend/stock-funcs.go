@@ -666,7 +666,6 @@ func getWatchlist(w http.ResponseWriter, r *http.Request) {
 
 	r = r.WithContext(ctx)
 
-	// Log handler entry
 	Logger.InfoContext(ctx, "Handler execution started", "method", r.Method, "target", r.URL.Path)
 
 	span.SetAttributes(
@@ -722,10 +721,10 @@ func getWatchlist(w http.ResponseWriter, r *http.Request) {
 	dbQueryDuration.Record(ctx, dbCallDuration, metric.WithAttributes(
 		attribute.String("db.table", "UserSymbols"),
 		attribute.String("db.operation", "SELECT"),
-		attribute.Bool("db.error", err != nil), // Reflect actual error status
+		attribute.Bool("db.error", err != nil),
 	))
 
-	if err != nil { // Re-check err for HTTP response
+	if err != nil {
 		span.SetStatus(codes.Error, fmt.Sprintf("Failed to retrieve watchlist: %v", err))
 		span.RecordError(err)
 		http.Error(w, "Failed to retrieve watchlist", http.StatusInternalServerError)
@@ -756,7 +755,6 @@ func removeFromWatchlist(w http.ResponseWriter, r *http.Request) {
 
 	r = r.WithContext(ctx)
 
-	// Log handler entry
 	Logger.InfoContext(ctx, "Handler execution started", "method", r.Method, "target", r.URL.Path)
 
 	span.SetAttributes(
@@ -789,7 +787,6 @@ func removeFromWatchlist(w http.ResponseWriter, r *http.Request) {
 		attribute.String("user_id", userId),
 		attribute.String("symbol_to_remove", symbol),
 	)
-	// Assuming DB is defined and connected
 	result := DB.Where("user_id = ? AND symbol = ?", userId, symbol).Delete(&UserSymbols{})
 	dbCallDuration := time.Since(startTime).Seconds()
 	dbCallSpan.End()

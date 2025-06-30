@@ -205,7 +205,8 @@ async function handleLogin() {
     }, 1500)
     
     span.setStatus({ code: 1 })
-    
+    window.location = '/stocks'
+
   } catch (err) {
     error.value = err.message
     
@@ -214,7 +215,7 @@ async function handleLogin() {
       'error.message': err.message,
       'error.type': err.constructor.name
     })
-    
+
     span.setStatus({ code: 2, message: err.message })
   } finally {
     loading.value = false
@@ -247,7 +248,7 @@ async function handleRegister() {
     
     const apiUrl = import.meta.env.VITE_API_URL || ""
     const endpoint = `${apiUrl}/users/register`
-    
+    console.log(endpoint)
     const headers = {}
     propagation.inject(context.active(), headers)
     headers['Content-Type'] = 'application/json'
@@ -300,6 +301,7 @@ async function handleRegister() {
       'user.registered': true
     })
     
+    window.location = '/stocks'
     span.setStatus({ code: 1 })
     
   } catch (err) {

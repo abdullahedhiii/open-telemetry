@@ -89,6 +89,13 @@ spec:
                 name: otel-collector-service
                 port:
                   number: 4318
+          - path: /v1/metrics
+            pathType: Prefix
+            backend:
+              service:
+                name: otel-collector-service
+                port:
+                  number: 4318
     - host: cadvisor.127.0.0.1.sslip.io 
       http:
         paths:

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -39,14 +40,24 @@ type ErrorResponse struct {
 	Error   string `json:"error,omitempty"`
 }
 
-func isValidEmail(email string) bool               { return true }
-func isValidUsername(username string) bool         { return true }
-func isValidPassword(password string) bool         { return true }
-func generateJWT(user *User) (string, error)       { return "dummy-jwt", nil }
-func hashPassword(password string) (string, error) { return "hashed-password", nil }
-func checkPassword(password, hash string) bool     { return true }
+func generateJWT(user *User) (string, error)              { return "dummy-jwt", nil }
+func hashPassword(password string) (string, error)        { return "hashed-password", nil }
+func verifyPassword(hashedPassword, password string) bool { return true } // Add password verification
 
 func loginUser(w http.ResponseWriter, r *http.Request) {
+	// Check DB initialization first and return early if nil
+	if DB == nil {
+		fmt.Println("DB is not initialized")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Success: false,
+			Message: "Database not available",
+			Error:   "DB_NOT_INITIALIZED",
+		})
+		return
+	}
+
 	ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
 	tracer := otel.Tracer("stock-tracker-app-tracer")
 	startTime := time.Now()
@@ -61,25 +72,33 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 	defer span.End()
 
 	w.Header().Set("Content-Type", "application/json")
-	loginAttempts.Add(ctx, 1, metric.WithAttributes(attribute.String("endpoint", "login")))
+
+	// Add nil check for metrics
+	if loginAttempts != nil {
+		loginAttempts.Add(ctx, 1, metric.WithAttributes(attribute.String("endpoint", "login")))
+	}
 
 	var loginReq LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&loginReq); err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Invalid JSON")
-		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Success: false,
+			Message: "Invalid JSON payload",
+			Error:   err.Error(),
+		})
 		return
 	}
 
+	// Validate input
 	if loginReq.Email == "" || loginReq.Password == "" {
-		span.SetStatus(codes.Error, "Missing fields")
-		http.Error(w, "Email and password required", http.StatusBadRequest)
-		return
-	}
-
-	if !isValidEmail(loginReq.Email) {
-		span.SetStatus(codes.Error, "Invalid email format")
-		http.Error(w, "Invalid email format", http.StatusBadRequest)
+		span.SetStatus(codes.Error, "Missing required fields")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Success: false,
+			Message: "Email and password are required",
+		})
 		return
 	}
 
@@ -91,29 +110,51 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		span.RecordError(err)
 		if err == gorm.ErrRecordNotFound {
-			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(ErrorResponse{
+				Success: false,
+				Message: "Invalid credentials",
+			})
 		} else {
-			http.Error(w, "Database error", http.StatusInternalServerError)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(ErrorResponse{
+				Success: false,
+				Message: "Database error",
+				Error:   err.Error(),
+			})
 		}
 		return
 	}
 
-	if !checkPassword(loginReq.Password, user.Password) {
+	// Add password verification (you'll need to implement this properly)
+	if !verifyPassword(user.Password, loginReq.Password) {
 		span.SetStatus(codes.Error, "Invalid password")
-		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Success: false,
+			Message: "Invalid credentials",
+		})
 		return
 	}
 
 	token, err := generateJWT(&user)
 	if err != nil {
 		span.RecordError(err)
-		http.Error(w, "Token generation failed", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Success: false,
+			Message: "Token generation failed",
+			Error:   err.Error(),
+		})
 		return
 	}
 
-	authDuration.Record(ctx, time.Since(startTime).Seconds(),
-		metric.WithAttributes(attribute.String("endpoint", "login")),
-	)
+	// Record metrics with nil check
+	if authDuration != nil {
+		authDuration.Record(ctx, time.Since(startTime).Seconds(),
+			metric.WithAttributes(attribute.String("endpoint", "login")),
+		)
+	}
 	span.SetStatus(codes.Ok, "Login successful")
 
 	json.NewEncoder(w).Encode(AuthResponse{
@@ -125,6 +166,19 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func registerUser(w http.ResponseWriter, r *http.Request) {
+	// Check DB initialization first
+	if DB == nil {
+		fmt.Println("DB is not initialized")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Success: false,
+			Message: "Database not available",
+			Error:   "DB_NOT_INITIALIZED",
+		})
+		return
+	}
+
 	ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
 	tracer := otel.Tracer("stock-tracker-app-tracer")
 	startTime := time.Now()
@@ -139,48 +193,84 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 	defer span.End()
 
 	w.Header().Set("Content-Type", "application/json")
-	registerAttempts.Add(ctx, 1, metric.WithAttributes(attribute.String("endpoint", "register")))
+
+	// Add nil check for metrics
+	if registerAttempts != nil {
+		registerAttempts.Add(ctx, 1, metric.WithAttributes(attribute.String("endpoint", "register")))
+	}
 
 	var req RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		span.RecordError(err)
-		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Success: false,
+			Message: "Invalid JSON payload",
+			Error:   err.Error(),
+		})
 		return
 	}
 
-	if req.Username == "" || req.Email == "" || req.Password == "" {
-		http.Error(w, "All fields are required", http.StatusBadRequest)
-		return
-	}
-	if !isValidEmail(req.Email) || !isValidUsername(req.Username) || !isValidPassword(req.Password) {
-		http.Error(w, "Invalid input format", http.StatusBadRequest)
+	// Validate input
+	if req.Email == "" || req.Password == "" || req.Username == "" {
+		span.SetStatus(codes.Error, "Missing required fields")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Success: false,
+			Message: "Username, email, and password are required",
+		})
 		return
 	}
 
 	var existing User
 
+	// Check email uniqueness
 	if err := DB.Where("email = ?", req.Email).First(&existing).Error; err == nil {
-		http.Error(w, "Email already in use", http.StatusConflict)
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Success: false,
+			Message: "Email already in use",
+		})
 		return
 	} else if err != gorm.ErrRecordNotFound {
 		span.RecordError(err)
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Success: false,
+			Message: "Database error",
+			Error:   err.Error(),
+		})
 		return
 	}
 
+	// Check username uniqueness
 	if err := DB.Where("username = ?", req.Username).First(&existing).Error; err == nil {
-		http.Error(w, "Username already taken", http.StatusConflict)
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Success: false,
+			Message: "Username already taken",
+		})
 		return
 	} else if err != gorm.ErrRecordNotFound {
 		span.RecordError(err)
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Success: false,
+			Message: "Database error",
+			Error:   err.Error(),
+		})
 		return
 	}
 
 	hashedPwd, err := hashPassword(req.Password)
 	if err != nil {
 		span.RecordError(err)
-		http.Error(w, "Password hashing failed", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Success: false,
+			Message: "Password hashing failed",
+			Error:   err.Error(),
+		})
 		return
 	}
 
@@ -192,13 +282,21 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 
 	if err := DB.Create(user).Error; err != nil {
 		span.RecordError(err)
-		http.Error(w, "User creation failed", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Success: false,
+			Message: "User creation failed",
+			Error:   err.Error(),
+		})
 		return
 	}
 
-	authDuration.Record(ctx, time.Since(startTime).Seconds(),
-		metric.WithAttributes(attribute.String("endpoint", "register")),
-	)
+	// Record metrics with nil check
+	if authDuration != nil {
+		authDuration.Record(ctx, time.Since(startTime).Seconds(),
+			metric.WithAttributes(attribute.String("endpoint", "register")),
+		)
+	}
 	span.SetStatus(codes.Ok, "Registration successful")
 
 	w.WriteHeader(http.StatusCreated)

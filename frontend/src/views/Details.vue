@@ -28,7 +28,7 @@ const cryptoData = computed(() => {
   return dataType.value === 'crypto' ? detailsData.value : null
 })
 
-// Computed properties for stock data
+
 const currentPrice = computed(() => {
   if (!stockData.value?.timeSeries) return '0.00'
   const dates = Object.keys(stockData.value.timeSeries).sort().reverse()
@@ -61,7 +61,7 @@ const limitedTimeSeriesData = computed(() => {
   if (!stockData.value?.timeSeries) return {}
   const entries = Object.entries(stockData.value.timeSeries)
   const sortedEntries = entries.sort(([a], [b]) => new Date(b) - new Date(a))
-  const limitedEntries = sortedEntries.slice(0, 10) // Show last 10 days
+  const limitedEntries = sortedEntries.slice(0, 10) 
   return Object.fromEntries(limitedEntries)
 })
 
@@ -120,7 +120,7 @@ async function fetchData() {
     const responseData = await response.json();
     detailsData.value = responseData;
     
-    // Debug log to see the structure
+    
     console.log('API Response:', responseData);
     console.log('Is Array:', Array.isArray(responseData));
     if (Array.isArray(responseData)) {
@@ -130,7 +130,7 @@ async function fetchData() {
     detailsSpan.setStatus({ code: 1 });
     detailsSpan.end();
 
-    // Check if symbol is in watchlist
+    
     checkWatchlistStatus();
     
   } catch (err) {
@@ -168,11 +168,11 @@ function toggleWatchlist() {
     let watchlist = savedWatchlist ? JSON.parse(savedWatchlist) : []
     
     if (isInWatchlist.value) {
-      // Remove from watchlist
+      
       watchlist = watchlist.filter(item => !(item.symbol === symbol.value && item.type === type.value))
       isInWatchlist.value = false
     } else {
-      // Add to watchlist
+      
       const itemName = type.value === 'crypto' 
         ? (cryptoData.value?.name || symbol.value)
         : (stockData.value?.metaData?.symbol || stockData.value?.name || symbol.value);
@@ -209,19 +209,15 @@ onMounted(() => {
       'lifecycle.event': 'mounted'
     }
   })
-  
-  // Get symbol and type from URL path or query params
 
     type.value = window.location.pathname.includes('/stocks') ? 'stocks' : 'crypto'
     symbol.value = window.location.pathname.split('/').pop() 
-  
   
   span.setAttributes({
     'url.symbol': symbol.value,
     'url.type': type.value
   })
-  
-  // Load data on mount
+    
   fetchData()
   
   span.setStatus({ code: 1 })

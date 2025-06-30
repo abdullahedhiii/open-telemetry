@@ -10,7 +10,90 @@ const watchlist = ref([])
 const searchQuery = ref('')
 const filteredSymbols = ref([])
 
-// Enhanced tracing with more detailed instrumentation
+async function fetchWatchlist() {
+  const userId = JSON.parse(localStorage.getItem("userData")).ID
+  const mainSpan = tracer.startSpan('fetch_user_watchlist', {
+    attributes: {
+      'operation': 'fetch_watchlist',
+      'watchlist.user_id': userId,
+      'component': 'watchlist_service',
+      'page.context': 'dashboard'
+    }
+  })
+
+  const ctx = trace.setSpan(context.active(), mainSpan)
+  const headers = {}
+  propagation.inject(ctx, headers)
+
+  try {
+    const apiUrl = import.meta.env.VITE_API_URL
+    const fullUrl = `${apiUrl}/watchlist/${userId}`
+
+    mainSpan.setAttribute('http.url', fullUrl)
+
+    const httpSpan = tracer.startSpan('http_request_watchlist', {
+      parent: mainSpan,
+      attributes: {
+        'http.method': 'GET',
+        'http.url': fullUrl,
+        'user.agent': navigator.userAgent
+      }
+    })
+
+    const response = await fetch(fullUrl, {
+      method: 'GET',
+      headers
+    })
+
+    httpSpan.setAttribute('http.status_code', response.status)
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+
+    const processingSpan = tracer.startSpan('process_watchlist_data', {
+      parent: httpSpan,
+      attributes: {
+        'processing.type': 'json_decode'
+      }
+    })
+
+    const result = await response.json()
+    // console.log(result)
+    const items = Array.isArray(result) ? result :  []
+// console.log(items)
+watchlist.value = items
+  .filter(item => item.Type === 'CRYPTO')
+  .map(item => ({ Symbol: item.Symbol, CryptoId: item.CryptoId }))
+    console.log(watchlist.value)
+    processingSpan.setAttributes({
+      'watchlist.items_total': items.length
+    })
+    processingSpan.setStatus({ code: 1 })
+    processingSpan.end()
+
+    httpSpan.setStatus({ code: 1 })
+    httpSpan.end()
+
+    mainSpan.setAttributes({
+      'watchlist.items_count': watchlist.value.length,
+      'operation.success': true
+    })
+    mainSpan.setStatus({ code: 1 })
+
+  } catch (err) {
+    console.error("Error fetching watchlist:", err)
+    mainSpan.setAttributes({
+      'error.message': err.message,
+      'operation.success': false
+    })
+    mainSpan.setStatus({ code: 2, message: err.message })
+  } finally {
+    mainSpan.end()
+  }
+}
+
+
 async function fetchSymbols() {
   const mainSpan = tracer.startSpan('fetchCryptoSymbols', {
     attributes: {
@@ -26,7 +109,7 @@ async function fetchSymbols() {
     error.value = null
     loading.value = true
     
-    // Add performance tracking
+    
     const startTime = performance.now()
     mainSpan.setAttribute('fetch.start_time', startTime)
     
@@ -126,7 +209,7 @@ function viewDetails(symbolId, symbolName) {
   })
   
   try {
-    // Enhanced user interaction tracking
+    
     span.setAttributes({
       'interaction.timestamp': Date.now(),
       'page.section': 'symbol_table'
@@ -144,71 +227,129 @@ function viewDetails(symbolId, symbolName) {
   }
 }
 
-function addToWatchlist(symbolId) {
-  const span = tracer.startSpan('add_to_watchlist', {
+
+async function addToWatchlist(symbol,id) {
+  const span = tracer.startSpan('add_crypto_to_watchlist', {
     attributes: {
-      'symbol.id': symbolId,
+      'crypto.symbol': symbol,
       'user.action': 'add_watchlist',
-      'watchlist.size_before': watchlist.value.length
+      'interaction.type': 'add_item'
     }
   })
-  
+
   try {
-    if (!watchlist.value.includes(symbolId)) {
-      watchlist.value.push(symbolId)
-      
-      span.setAttributes({
-        'watchlist.size_after': watchlist.value.length,
-        'operation.success': true,
-        'watchlist.action': 'added'
-      })
-    } else {
-      span.setAttributes({
-        'operation.success': false,
-        'error.reason': 'symbol_already_exists'
-      })
+    const userData = localStorage.getItem("userData")
+    if (!userData) {
+      throw new Error("User not logged in")
     }
-    
+
+    const parsedUser = JSON.parse(userData)
+    const userId = parsedUser.ID 
+
+    const apiUrl = import.meta.env.VITE_API_URL
+    const endpoint = `${apiUrl}/watchlist/add`
+
+    const payload = {
+      UserID: userId,
+      Type: "CRYPTO",
+      Symbol: symbol,
+      CryptoId: id
+    }
+
+    const headers = {}
+    const ctx = trace.setSpan(context.active(), span)
+    propagation.inject(ctx, headers)
+
+    headers['Content-Type'] = 'application/json'
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    })
+
+    span.setAttributes({
+      'http.status_code': response.status,
+      'watchlist.symbol': symbol
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to add to watchlist: ${response.statusText}`)
+    }
+    await fetchWatchlist()
+    filterSymbols()
     span.setStatus({ code: 1 })
   } catch (err) {
+    console.error("Error adding to watchlist:", err)
+    span.setAttributes({
+      'operation.success': false,
+      'error.message': err.message
+    })
+    span.setStatus({ code: 2, message: err.message })
+  } finally {
+    span.end()
+  }
+}
+async function removeFromWatchlist(symbol,id) {
+  const span = tracer.startSpan('remove_crypto_from_watchlist', {
+    attributes: {
+      'crypto.symbol': symbol,
+      'user.action': 'remove_watchlist',
+      'interaction.type': 'remove_item'
+    }
+  })
+
+  try {
+    const userData = localStorage.getItem("userData")
+    if (!userData) {
+      throw new Error("User not logged in")
+    }
+
+    const parsedUser = JSON.parse(userData)
+    const userId = parsedUser.ID 
+
+    const apiUrl = import.meta.env.VITE_API_URL
+    const endpoint = `${apiUrl}/watchlist/remove/crypto/${userId}/${id}`
+
+    const headers = {}
+    const ctx = trace.setSpan(context.active(), span)
+    propagation.inject(ctx, headers)
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers
+    })
+
+    span.setAttributes({
+      'http.status_code': response.status,
+      'watchlist.symbol': symbol
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to remove from watchlist: ${response.statusText}`)
+    }
+    await fetchWatchlist()
+    filterSymbols()
+    span.setStatus({ code: 1 })
+  } catch (err) {
+    console.error("Error removing from watchlist:", err)
+    span.setAttributes({
+      'error.message': err.message,
+      'operation.success': false
+    })
     span.setStatus({ code: 2, message: err.message })
   } finally {
     span.end()
   }
 }
 
-function removeFromWatchlist(symbolId) {
-  const span = tracer.startSpan('remove_from_watchlist', {
-    attributes: {
-      'symbol.id': symbolId,
-      'user.action': 'remove_watchlist',
-      'watchlist.size_before': watchlist.value.length
-    }
-  })
-  
-  try {
-    const index = watchlist.value.indexOf(symbolId)
-    if (index > -1) {
-      watchlist.value.splice(index, 1)
-      
-      span.setAttributes({
-        'watchlist.size_after': watchlist.value.length,
-        'operation.success': true,
-        'watchlist.action': 'removed'
-      })
-    }
-    
-    span.setStatus({ code: 1 })
-  } catch (err) {
-    span.setStatus({ code: 2, message: err.message })
-  } finally {
-    span.end()
-  }
-}
 
 function isInWatchlist(symbolId) {
-  return watchlist.value.includes(symbolId)
+  // console.log("Filtered symbols",filteredSymbols)
+  // console.log('Checking:', normalizedId, 'against', watchlist.value)
+  return watchlist.value.some(cc => cc.CryptoId === symbolId)
 }
+
 
 function filterSymbols() {
   const span = tracer.startSpan('filter_symbols', {
@@ -225,6 +366,7 @@ function filterSymbols() {
       filteredSymbols.value = symbols.value.filter(stock => 
         stock.Symbol?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
         stock.Name?.toLowerCase().includes(searchQuery.value.toLowerCase())
+        // stock.CryptoId?.toLowerCase().includes(searchQuery.value.toLowerCase()
       )
     }
     
@@ -241,7 +383,7 @@ function filterSymbols() {
   }
 }
 
-// Track component lifecycle
+
 onMounted(() => {
   const span = tracer.startSpan('component_mounted', {
     attributes: {
@@ -249,7 +391,7 @@ onMounted(() => {
       'lifecycle.event': 'mounted'
     }
   })
-  
+  fetchWatchlist()
   span.setStatus({ code: 1 })
   span.end()
 })
@@ -329,7 +471,7 @@ onMounted(() => {
                   
                   <button 
                     v-if="!isInWatchlist(stock.Id)"
-                    @click="addToWatchlist(stock.Id)"
+                    @click="addToWatchlist(stock.Symbol,stock.Id)"
                     class="action-button add-button"
                   >
                     Add to List
@@ -337,7 +479,7 @@ onMounted(() => {
                   
                   <button 
                     v-else
-                    @click="removeFromWatchlist(stock.Id)"
+                    @click="removeFromWatchlist(stock.Symbol,stock.Id)"
                     class="action-button remove-button"
                   >
                     Remove
@@ -358,13 +500,13 @@ onMounted(() => {
       
       <div class="watchlist-grid">
         <div 
-          v-for="symbolId in watchlist" 
-          :key="symbolId" 
+          v-for="cc in watchlist" 
+          :key="cc.CryptoId" 
           class="watchlist-item"
         >
-          <span class="watchlist-symbol">{{ symbolId }}</span>
+          <span class="watchlist-symbol">{{ cc.Symbol }}</span>
           <button 
-            @click="removeFromWatchlist(symbolId)"
+            @click="removeFromWatchlist(cc.CryptoId)"
             class="remove-from-watchlist"
           >
             ×

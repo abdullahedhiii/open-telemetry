@@ -25,7 +25,7 @@ type User struct {
 	ID       int    `gorm:"primaryKey;autoIncrement"`
 	Username string `gorm:"size:100;unique"`
 	Email    string `gorm:"size:200;unique"`
-	Password string `gorm:"size:200"`
+	Password string `json:"-"`
 }
 
 type UserSymbols struct {

@@ -51,7 +51,7 @@ func main() {
 	router.HandleFunc("/crypto/{symbol}", getCryptoData).Methods("GET")
 	router.HandleFunc("/watchlist/add", addToWatchlist).Methods("POST")
 	router.HandleFunc("/watchlist/{userId}", getWatchlist).Methods("GET")
-	router.HandleFunc("/watchlist/remove/{userId}/{symbol}", removeFromWatchlist).Methods("POST")
+	router.HandleFunc("/watchlist/remove/{userId}/{type}/{symbol}", removeFromWatchlist).Methods("POST")
 
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"*"},
