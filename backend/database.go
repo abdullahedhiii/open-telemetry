@@ -191,7 +191,7 @@ func getDBConnectionString() string {
 	host := getEnv("DB_HOST", "postgres.default.svc.cluster.local")
 	user := getEnv("DB_USER", "abdullah")
 	password := getEnv("DB_PASSWORD", "edhi")
-	dbname := getEnv("DB_NAME", "mydb1")
+	dbname := getEnv("DB_NAME", "mydb_1")
 	port := getEnv("DB_PORT", "5432")
 	sslmode := getEnv("DB_SSLMODE", "disable")
 

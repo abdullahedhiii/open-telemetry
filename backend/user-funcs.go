@@ -46,6 +46,7 @@ func hashPassword(password string) (string, error)        { return "hashed-passw
 func verifyPassword(hashedPassword, password string) bool { return true }
 
 func loginUser(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Login request received")
 	if DB == nil {
 		fmt.Println("DB is not initialized")
 		w.Header().Set("Content-Type", "application/json")
