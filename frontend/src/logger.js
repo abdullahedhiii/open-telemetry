@@ -1,15 +1,14 @@
 import { propagation, context, trace } from '@opentelemetry/api'
 
-export async function logFrontendEvent({ event,type, metadata }) {
-  const userData = JSON.parse(localStorage.getItem('userData') || '{}')
-  const span = trace.getActiveSpan() || trace.getTracer('app').startSpan('frontend_log_event')
-
-  const ctx = trace.setSpan(context.active(), span)
+export async function logFrontendEvent({ event, type, metadata, span }) {
   const headers = {}
-
+  const ctx = span ? trace.setSpan(context.active(), span) : context.active()
+ 
+  console.log(span ? 'yes' : 'no')
   propagation.inject(ctx, headers)
-
   headers['Content-Type'] = 'application/json'
+
+  console.log("Sending request to backend -post log")
 
   await fetch(import.meta.env.VITE_API_URL + '/log-event', {
     method: 'POST',
@@ -22,5 +21,5 @@ export async function logFrontendEvent({ event,type, metadata }) {
     })
   })
 
-  span.end()
+  console.log("Request sent to backend -post log")
 }

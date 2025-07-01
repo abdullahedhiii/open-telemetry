@@ -2,6 +2,7 @@
 import { tracer } from '../tracing.js'
 import { ref, onMounted } from 'vue'
 import { context, propagation, trace } from '@opentelemetry/api'
+import {logFrontendEvent} from "../logger.js"
 
 const symbols = ref([])
 const error = ref(null)
@@ -12,6 +13,15 @@ const filteredSymbols = ref([])
 
 async function fetchWatchlist() {
   const userId = JSON.parse(localStorage.getItem("userData")).ID
+    logFrontendEvent({
+    event: 'fetch_watchlist',
+    type: 'Success',
+    metadata: {
+      userId,
+      pageContext: 'Crypto_View'
+    },
+    span: null
+  })
   const mainSpan = tracer.startSpan('fetch_user_watchlist', {
     attributes: {
       'operation': 'fetch_watchlist',
@@ -24,7 +34,15 @@ async function fetchWatchlist() {
   const ctx = trace.setSpan(context.active(), mainSpan)
   const headers = {}
   propagation.inject(ctx, headers)
-
+logFrontendEvent({
+    event: 'fetch_watchlist_start',
+    type: 'Success',
+    metadata: {
+      userId,
+      pageContext: 'Crypto_View'
+    },
+    span: mainSpan
+  })
   try {
     const apiUrl = import.meta.env.VITE_API_URL
     const fullUrl = `${apiUrl}/watchlist/${userId}`
@@ -39,7 +57,15 @@ async function fetchWatchlist() {
         'user.agent': navigator.userAgent
       }
     })
-
+ logFrontendEvent({
+    event: 'fetch_watchlist_request_sent',
+    type: 'Success',
+    metadata: {
+      userId,
+      pageContext: 'Crypto_View'
+    },
+    span: httpSpan
+  })
     const response = await fetch(fullUrl, {
       method: 'GET',
       headers
@@ -48,7 +74,16 @@ async function fetchWatchlist() {
     httpSpan.setAttribute('http.status_code', response.status)
 
     if (!response.ok) {
+       logFrontendEvent({
+    event: 'fetch_watchlist_error',
+    type: 'Error',
+    metadata: {
+      userId,
+      pageContext: 'Crypto_View',
+      error: 'Response not ok',}})
+  
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      
     }
 
     const processingSpan = tracer.startSpan('process_watchlist_data', {
@@ -61,7 +96,16 @@ async function fetchWatchlist() {
     const result = await response.json()
     // console.log(result)
     const items = Array.isArray(result) ? result :  []
-// console.log(items)
+ logFrontendEvent({
+    event: 'processing watchlist',
+    type: 'Success',
+    metadata: {
+      userId,
+      pageContext: 'Crypto_View'
+    },
+    span: processingSpan
+  })
+
 watchlist.value = items
   .filter(item => item.Type === 'CRYPTO')
   .map(item => ({ Symbol: item.Symbol, CryptoId: item.CryptoId }))
@@ -79,14 +123,33 @@ watchlist.value = items
       'watchlist.items_count': watchlist.value.length,
       'operation.success': true
     })
-    mainSpan.setStatus({ code: 1 })
 
+    mainSpan.setStatus({ code: 1 })
+logFrontendEvent({
+    event: 'watchlist fetched and processed',
+    type: 'Success',
+    metadata: {
+      userId,
+      pageContext: 'Stocks_View'
+    },
+    span: mainSpan
+  })
   } catch (err) {
     console.error("Error fetching watchlist:", err)
     mainSpan.setAttributes({
       'error.message': err.message,
       'operation.success': false
     })
+     logFrontendEvent({
+    event: 'fetch_watchlist_error',
+    type: 'Error',
+    metadata: {
+      userId,
+      pageContext: 'Stocks_View',
+      error :err
+    },
+    span: mainSpan
+  })
     mainSpan.setStatus({ code: 2, message: err.message })
   } finally {
     mainSpan.end()
@@ -345,8 +408,6 @@ async function removeFromWatchlist(symbol,id) {
 
 
 function isInWatchlist(symbolId) {
-  // console.log("Filtered symbols",filteredSymbols)
-  // console.log('Checking:', normalizedId, 'against', watchlist.value)
   return watchlist.value.some(cc => cc.CryptoId === symbolId)
 }
 
@@ -366,7 +427,6 @@ function filterSymbols() {
       filteredSymbols.value = symbols.value.filter(stock => 
         stock.Symbol?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
         stock.Name?.toLowerCase().includes(searchQuery.value.toLowerCase())
-        // stock.CryptoId?.toLowerCase().includes(searchQuery.value.toLowerCase()
       )
     }
     

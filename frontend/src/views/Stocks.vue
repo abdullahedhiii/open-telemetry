@@ -2,6 +2,7 @@
 import { tracer } from '../tracing.js'
 import { ref, onMounted, computed } from 'vue'
 import { context, propagation, trace } from '@opentelemetry/api'
+import {logFrontendEvent} from "../logger.js"
 
 const symbols = ref([])
 const error = ref(null)
@@ -13,6 +14,15 @@ const sortOrder = ref('asc')
 
 async function fetchWatchlist() {
   const userId = JSON.parse(localStorage.getItem("userData")).ID
+  logFrontendEvent({
+    event: 'fetch_watchlist',
+    type: 'Success',
+    metadata: {
+      userId,
+      pageContext: 'Stocks_View'
+    },
+    span: null
+  })
   const mainSpan = tracer.startSpan('fetch_user_watchlist', {
     attributes: {
       'operation': 'fetch_watchlist',
@@ -25,6 +35,16 @@ async function fetchWatchlist() {
   const ctx = trace.setSpan(context.active(), mainSpan)
   const headers = {}
   propagation.inject(ctx, headers)
+  
+  logFrontendEvent({
+    event: 'fetch_watchlist_start',
+    type: 'Success',
+    metadata: {
+      userId,
+      pageContext: 'Stocks_View'
+    },
+    span: mainSpan
+  })
 
   try {
     const apiUrl = import.meta.env.VITE_API_URL
@@ -41,6 +61,16 @@ async function fetchWatchlist() {
       }
     })
 
+   logFrontendEvent({
+    event: 'fetch_watchlist_request_sent',
+    type: 'Success',
+    metadata: {
+      userId,
+      pageContext: 'Stocks_View'
+    },
+    span: httpSpan
+  })
+
     const response = await fetch(fullUrl, {
       method: 'GET',
       headers
@@ -49,6 +79,17 @@ async function fetchWatchlist() {
     httpSpan.setAttribute('http.status_code', response.status)
 
     if (!response.ok) {
+       logFrontendEvent({
+    event: 'fetch_watchlist_error',
+    type: 'Error',
+    metadata: {
+      userId,
+      pageContext: 'Stocks_View',
+      error: 'Response not ok'
+    },
+    span: httpSpan
+  })
+
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
 
@@ -63,6 +104,15 @@ async function fetchWatchlist() {
     const items = Array.isArray(result) ? result : result.watchlist || []
 
     watchlist.value = items.filter(item => item.Type == 'STOCK').map(item=> item.Symbol)
+ logFrontendEvent({
+    event: 'processing watchlist',
+    type: 'Success',
+    metadata: {
+      userId,
+      pageContext: 'Stocks_View'
+    },
+    span: processingSpan
+  })
 
     processingSpan.setAttributes({
       'watchlist.items_total': items.length
@@ -78,6 +128,15 @@ async function fetchWatchlist() {
       'operation.success': true
     })
     mainSpan.setStatus({ code: 1 })
+ logFrontendEvent({
+    event: 'watchlist fetched and processed',
+    type: 'Success',
+    metadata: {
+      userId,
+      pageContext: 'Stocks_View'
+    },
+    span: mainSpan
+  })
 
   } catch (err) {
     console.error("Error fetching watchlist:", err)
@@ -85,6 +144,17 @@ async function fetchWatchlist() {
       'error.message': err.message,
       'operation.success': false
     })
+     logFrontendEvent({
+    event: 'fetch_watchlist_error',
+    type: 'Error',
+    metadata: {
+      userId,
+      pageContext: 'Stocks_View',
+      error :err
+    },
+    span: mainSpan
+  })
+
     mainSpan.setStatus({ code: 2, message: err.message })
   } finally {
     mainSpan.end()

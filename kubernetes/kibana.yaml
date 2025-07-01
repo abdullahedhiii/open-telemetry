@@ -42,7 +42,7 @@ spec:
             - name: ELASTICSEARCH_HOSTS
               value: https://elasticsearch-service:9200
             - name: ELASTICSEARCH_SERVICEACCOUNTTOKEN
-              value: AAEAAWVsYXN0aWMva2liYW5hL2tpYmFuYS10b2tlbjpoTUZPSDFLbVI3U1pOaFBULURoVU13
+              value: AAEAAWVsYXN0aWMva2liYW5hL2tpYmFuYV90b2tlbjpGdVdKdG81YlJoLU9NcUhWeG5tN3pR
             - name: ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES
               value: /usr/share/kibana/config/certs/http_ca.crt
             - name: ELASTICSEARCH_SSL_VERIFICATIONMODE
