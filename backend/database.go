@@ -188,7 +188,7 @@ func initDB() error {
 }
 
 func getDBConnectionString() string {
-	host := getEnv("DB_HOST", "host.docker.internal")
+	host := getEnv("DB_HOST", "postgres.default.svc.cluster.local")
 	user := getEnv("DB_USER", "abdullah")
 	password := getEnv("DB_PASSWORD", "edhi")
 	dbname := getEnv("DB_NAME", "mydb1")

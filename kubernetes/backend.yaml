@@ -4,7 +4,7 @@ metadata:
   name: shared-logs-pvc
 spec:
   accessModes:
-    - ReadWriteMany  #  allows multiple pods to mount the same volume
+    - ReadWriteMany  
   resources:
     requests:
       storage: 1Gi
