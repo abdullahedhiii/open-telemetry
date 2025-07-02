@@ -1,0 +1,12 @@
+dependencies:
+- name: postgresql
+  repository: https://charts.bitnami.com/bitnami
+  version: 12.8.5
+- name: prometheus
+  repository: https://prometheus-community.github.io/helm-charts
+  version: 27.23.0
+- name: elasticsearch
+  repository: https://charts.bitnami.com/bitnami
+  version: 22.0.10
+digest: sha256:ed28a2dacc2e44c937da62ae2224e72af942fd2f435171cc9b1476600ad807fe
+generated: "2025-07-02T14:55:03.678463+05:00"

@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.frontend.deploy.name }}
+spec:
+  replicas: {{ .Values.frontend.deploy.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.frontend.labels.app }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.frontend.labels.name }}
+    spec:
+      imagePullSecrets:
+        - name: regcred
+      containers:
+        - name: {{ .Values.frontend.deploy.containers.name }}
+          image: {{ .Values.frontend.deploy.containers.image }}
+          imagePullPolicy: {{ .Values.frontend.deploy.containers.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.frontend.deploy.containers.ports.containerPort }}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.frontend.service.name }}
+spec:
+  selector:
+    app: {{ .Values.frontend.labels.app }}
+  ports:
+    - protocol: {{ .Values.frontend.service.ports.protocol }}
+      port: {{ .Values.frontend.service.ports.port }}
+      targetPort: {{ .Values.frontend.service.ports.targetPort }}
+  type: {{ .Values.frontend.service.type }}
