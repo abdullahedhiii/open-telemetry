@@ -1,0 +1,103 @@
+frontend:
+  labels:
+    app: frontend
+    name: frontend
+  deploy:
+    name: frontend
+    replicas: 1
+    containers:
+      name: frontend
+      imagePullPolicy: Always
+      image: abdullahedhii/opentel-demo-project:frontend-image
+      ports:
+        containerPort: 80
+  service:
+    name: frontend-service
+    type: ClusterIP
+    ports:
+      protocol: TCP
+      port: 6600
+      targetPort: 80
+
+backend:
+  deploy:
+    name: backend
+    replicas: 1
+    image: abdullahedhii/opentel-demo-project:backend-image
+    imagePullPolicy: Always
+    containers:
+      name: backend
+      ports:
+        - name: http
+          containerPort: 8000
+        - name: metrics
+          containerPort: 2222
+    volumeMounts:
+      - name: shared-log
+        mountPath: /fluentd/log
+
+  pvc:
+    name: shared-logs-pvc
+    accessModes:
+      - ReadWriteMany
+    resources:
+      requests:
+        storage: 1Gi
+
+  service:
+    name: backend-service
+    type: ClusterIP
+    ports:
+      - name: http
+        port: 8000
+        targetPort: 8000
+        protocol: TCP
+      - name: metrics
+        port: 2222
+        targetPort: 2222
+        protocol: TCP
+
+kibana:
+  fullnameOverride: kibana-service
+
+  elasticsearchHosts: "https://elasticsearch-service:9200"
+
+  automountToken: true
+
+  auth:
+    enabled: true
+    createServiceAccountToken: true
+
+  elasticsearchCertificateSecret: es-ca-cert
+  elasticsearchCertificateAuthoritiesFile: http_ca.crt
+
+  replicas: 1
+
+  extraEnvs:
+    - name: NODE_OPTIONS
+      value: "--max-old-space-size=1800"
+    - name: NODE_TLS_REJECT_UNAUTHORIZED
+      value: "0"
+    - name: ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES
+      value: /usr/share/kibana/config/certs/http_ca.crt
+    - name: ELASTICSEARCH_SSL_VERIFICATIONMODE
+      value: none
+
+  kibanaConfig:
+    kibana.yml: |
+      server.host: "0.0.0.0"
+      elasticsearch.hosts: ["https://elasticsearch-service:9200"]
+      elasticsearch.ssl.verificationMode: none
+      elasticsearch.ssl.certificateAuthorities: ["/usr/share/kibana/config/certs/http_ca.crt"]
+
+  resources:
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+
+  service:
+    type: ClusterIP
+    port: 5601

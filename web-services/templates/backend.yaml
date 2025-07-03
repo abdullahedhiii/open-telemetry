@@ -35,7 +35,7 @@ spec:
           image: {{ .Values.backend.deploy.image }}
           imagePullPolicy: {{ .Values.backend.deploy.imagePullPolicy }}
           ports:
-{{- range .Values.backend.deploy.ports }}
+{{- range .Values.backend.deploy.containers.ports }}
             - containerPort: {{ .containerPort }}
 {{- end }}
           volumeMounts:
@@ -62,3 +62,4 @@ spec:
       port: {{ .port }}
       targetPort: {{ .targetPort }}
 {{- end }}
+

@@ -1,39 +1,11 @@
-apiVersion: batch/v1
-kind: Job
+apiVersion: v1
+kind: Pod
 metadata:
-  name: ingress-nginx-admission-create
-  namespace: ingress-nginx
+  name: testpod
 spec:
-  template:
-    metadata:
-      name: ingress-nginx-admission-create
-    spec:
-      containers:
-      - name: create
-        image: registry.k8s.io/ingress-nginx/kube-webhook-certgen:v1.5.3
-        args:
-          - create
-          - --host=ingress-nginx-controller-admission,ingress-nginx-controller-admission.$(POD_NAMESPACE).svc
-          - --namespace=$(POD_NAMESPACE)
-          - --secret-name=ingress-nginx-admission
-        env:
-        - name: POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        imagePullPolicy: IfNotPresent
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-              - ALL
-          readOnlyRootFilesystem: true
-          runAsNonRoot: true
-          runAsUser: 65532
-          seccompProfile:
-            type: RuntimeDefault
-      restartPolicy: OnFailure
-      serviceAccountName: ingress-nginx-admission
-      nodeSelector:
-        kubernetes.io/os: linux
-
+  containers:
+  - name: test
+    image: abdullahedhii/opentel-demo-project:frontend-image
+    command: ["sleep", "3600"]
+  imagePullSecrets:
+  - name: regcred

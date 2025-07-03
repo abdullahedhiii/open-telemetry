@@ -2,7 +2,7 @@
 exec elasticpod -it -- bash
 cd bin 
 ./elasticsearch-reset-password -u elastic -i -b -f
-./elasticsearch-users useradd abdullah -p edhi -r superuser
+./elasticsearch-users useradd abdullah -p edhi12 -r superuser
 curl --cacert http_ca.crt --capath /usr/share/elasticsearch/config/certs https://localhost:9200
 cd certs /cd config (Certtificate)
 pbpaste | base64 -d
@@ -16,7 +16,9 @@ kubectl create secret generic es-ca-cert --from-file=http_ca.crt=./cert.crt
 
 minikube start --driver=docker --memory=4096mb --cpus=2 --kubernetes-version=v1.27.12 --embed-certs
 
-
+kubectl create secret generic elasticsearch-master-credentials \
+  --from-literal=username=abdullah \
+  --from-literal=password=edhi12
 
 minikube cp ingress-nginx-controller.tar /tmp/ingress-nginx-controller.tar
 minikube cp kube-webhook-certgen.tar /tmp/kube-webhook-certgen.tar
@@ -24,3 +26,17 @@ minikube ssh
 sudo docker load -i /tmp/ingress-nginx-controller.tar
 sudo docker load -i /tmp/kube-webhook-certgen.tar
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.12.2/deploy/static/provider/cloud/deploy.yaml
+
+kubectl create secret generic kibana-service-es-token \
+  --from-literal=token=AAEAAWVsYXN0aWMva2liYW5hL2tpYmFuYS10b2tlbjpablQtTk51OVItZVFEQTZyOXF0aDdB
+
+
+  kubectl create secret generic es-ca-cert --from-file=http_ca.crt=./http-ca.crt
+curl -k -u elastic:edhi12 "https://localhost:9200/_cat/indices?v"
+curl -k -u elastic:edhi12 "https://localhost:9200/_cat/indices?expand_wildcards=all&v"
+curl -k -u elastic:edhi12 "https://localhost:9200/_cluster/health?pretty"
+cd opt/bitnami/elasticsearch/config/certs
+
+kubectl create secret generic elasticsearch-master-credentials \
+  --from-literal=username=abdullah \
+  --from-literal=password=edhi12
