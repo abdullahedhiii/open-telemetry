@@ -40,3 +40,11 @@ cd opt/bitnami/elasticsearch/config/certs
 kubectl create secret generic elasticsearch-master-credentials \
   --from-literal=username=abdullah \
   --from-literal=password=edhi12
+
+  kubectl create secret docker-registry regcred \
+  --docker-username=abdullahedhii \
+  --docker-password=abdullah123@ \
+  --docker-email=abdullah.edhi@foundri.net
+
+
+AAEAAWVsYXN0aWMva2liYW5hL2tpYmFuYS10b2tlbjpQdFVrMGM2LVRRMmxteml4SjlfY2p3

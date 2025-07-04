@@ -1,0 +1,134 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluentd-config
+  namespace: {{ .Release.Namespace }}
+data:
+  fluent.conf: |
+    <source>
+      @type tail
+      path {{ .Values.fluentd.logPath }}
+      pos_file {{ .Values.fluentd.posFile }}
+      tag app.log
+      <parse>
+        @type json
+        time_key time
+        time_format %Y-%m-%dT%H:%M:%S.%NZ
+      </parse>
+    </source>
+
+    <filter app.log>
+      @type record_transformer
+      enable_ruby true
+      <record>
+        hostname "#{Socket.gethostname}"
+      </record>
+    </filter>
+
+    <match app.log>
+      @type elasticsearch
+      host {{ .Values.fluentd.elasticsearch.host }}
+      port {{ .Values.fluentd.elasticsearch.port }}
+      logstash_format true
+      include_tag_key true
+      tag_key @log_name
+      scheme {{ .Values.fluentd.elasticsearch.scheme }}
+      user {{ .Values.fluentd.elasticsearch.user }}
+      password {{ .Values.fluentd.elasticsearch.password }}
+      ssl_verify {{ .Values.fluentd.elasticsearch.sslVerify }}
+    </match>
+
+  wait-for-es.sh: |
+    #!/usr/bin/env ruby
+    require 'net/http'
+    require 'uri'
+    require 'openssl'
+
+    uri = URI.parse("{{ .Values.fluentd.elasticsearch.scheme }}://{{ .Values.fluentd.elasticsearch.host }}:{{ .Values.fluentd.elasticsearch.port }}")
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = {{ .Values.fluentd.elasticsearch.scheme | quote }} == "https"
+    http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+
+    request = Net::HTTP::Get.new(uri.request_uri)
+    request.basic_auth('{{ .Values.fluentd.elasticsearch.user }}', '{{ .Values.fluentd.elasticsearch.password }}')
+
+    puts "Waiting for Elasticsearch to be ready..."
+
+    until begin
+      response = http.request(request)
+      response.code == "200"
+    rescue
+      false
+    end
+      puts "Still waiting for Elasticsearch..."
+      sleep 2
+    end
+
+    puts "Elasticsearch is up. Starting Fluentd..."
+    exec "fluentd -c /fluentd/etc/fluent.conf -v"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fluentd
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fluentd
+  template:
+    metadata:
+      labels:
+        app: fluentd
+    spec:
+      containers:
+        - name: fluentd
+          image: {{ .Values.fluentd.image }}
+          command: ["/bin/sh", "-c", "/wait-for-es.sh"]
+          ports:
+            - containerPort: 24224
+            - containerPort: 24224
+              protocol: UDP
+          volumeMounts:
+            - name: config
+              mountPath: /fluentd/etc/
+            - name: script
+              mountPath: /wait-for-es.sh
+              subPath: wait-for-es.sh
+            - name: shared-log
+              mountPath: /fluentd/log
+          env:
+            - name: FLUENT_ELASTICSEARCH_HOST
+              value: {{ .Values.fluentd.elasticsearch.host | quote }}
+            - name: FLUENT_ELASTICSEARCH_PORT
+              value: {{ .Values.fluentd.elasticsearch.port | quote }}
+      volumes:
+        - name: config
+          configMap:
+            name: fluentd-config
+            items:
+              - key: fluent.conf
+                path: fluent.conf
+        - name: script
+          configMap:
+            name: fluentd-config
+            defaultMode: 0775
+            items:
+              - key: wait-for-es.sh
+                path: wait-for-es.sh
+        - name: shared-log
+          persistentVolumeClaim:
+            claimName: {{ .Values.fluentd.logPvc }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fluentd-service
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: fluentd
+  ports:
+    - port: 24224
+      targetPort: 24224

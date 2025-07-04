@@ -11,9 +11,9 @@ dependencies:
   - name: postgresql
     version: 12.8.5
     repository: https://charts.bitnami.com/bitnami
-  - name: elasticsearch
-    version: 22.0.10
-    repository: https://charts.bitnami.com/bitnami
+  # - name: elasticsearch
+  #   version: 22.0.10
+  #   repository: https://charts.bitnami.com/bitnami
 
 
 appVersion: "1.16.0"

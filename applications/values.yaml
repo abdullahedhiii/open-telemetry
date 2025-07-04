@@ -58,38 +58,13 @@ backend:
         protocol: TCP
 
 kibana:
-  fullnameOverride: kibana-service
-
-  elasticsearchHosts: "https://elasticsearch-service:9200"
-
-  automountToken: true
-
-  auth:
-    enabled: true
-    createServiceAccountToken: true
-
-  elasticsearchCertificateSecret: es-ca-cert
-  elasticsearchCertificateAuthoritiesFile: http_ca.crt
-
+  name: kibana
+  namespace: default
+  image: docker.elastic.co/kibana/kibana:8.13.4
   replicas: 1
-
-  extraEnvs:
-    - name: NODE_OPTIONS
-      value: "--max-old-space-size=1800"
-    - name: NODE_TLS_REJECT_UNAUTHORIZED
-      value: "0"
-    - name: ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES
-      value: /usr/share/kibana/config/certs/http_ca.crt
-    - name: ELASTICSEARCH_SSL_VERIFICATIONMODE
-      value: none
-
-  kibanaConfig:
-    kibana.yml: |
-      server.host: "0.0.0.0"
-      elasticsearch.hosts: ["https://elasticsearch-service:9200"]
-      elasticsearch.ssl.verificationMode: none
-      elasticsearch.ssl.certificateAuthorities: ["/usr/share/kibana/config/certs/http_ca.crt"]
-
+  service:
+    type: ClusterIP
+    port: 5601
   resources:
     limits:
       memory: "1Gi"
@@ -97,7 +72,13 @@ kibana:
     requests:
       memory: "512Mi"
       cpu: "500m"
-
-  service:
-    type: ClusterIP
-    port: 5601
+  elasticsearch:
+    hosts: https://elasticsearch-service:9200
+    token: AAEAAWVsYXN0aWMva2liYW5hL2tpYmFuYS10b2tlbjprSGdKYVdiZlFTU1FlZGxaQ1B1clNB
+    cert: /usr/share/kibana/config/certs/http_ca.crt
+    sslVerificationMode: none
+  config:
+    fleetEnabled: false
+    apmEnabled: false
+    monitoringEnabled: false
+    reportingEnabled: false

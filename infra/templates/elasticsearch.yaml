@@ -1,0 +1,91 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.elasticsearch.name }}-config
+  namespace: {{ .Values.elasticsearch.namespace }}
+  labels:
+    app: {{ .Values.elasticsearch.name }}
+data:
+  elasticsearch.yml: |
+    cluster.name: {{ .Values.elasticsearch.config.clusterName }}
+    node.name: ${HOSTNAME}
+    discovery.type: {{ .Values.elasticsearch.config.discoveryType }}
+    network.host: {{ .Values.elasticsearch.config.networkHost }}
+    http.port: {{ .Values.elasticsearch.service.ports.http }}
+    transport.port: {{ .Values.elasticsearch.service.ports.transport }}
+    xpack.security.enabled: {{ .Values.elasticsearch.config.xpackSecurityEnabled }}
+    xpack.security.http.ssl.enabled: {{ .Values.elasticsearch.config.xpackHttpSSLEnabled }}
+    xpack.security.transport.ssl.enabled: {{ .Values.elasticsearch.config.xpackTransportSSLEnabled }}
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.elasticsearch.name }}
+  namespace: {{ .Values.elasticsearch.namespace }}
+spec:
+  replicas: {{ .Values.elasticsearch.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.elasticsearch.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.elasticsearch.name }}
+    spec:
+      containers:
+        - name: {{ .Values.elasticsearch.name }}
+          image: {{ .Values.elasticsearch.image }}
+          ports:
+            - containerPort: {{ .Values.elasticsearch.service.ports.http }}
+              name: http
+            - containerPort: {{ .Values.elasticsearch.service.ports.transport }}
+              name: transport
+          env:
+            - name: ES_JAVA_OPTS
+              value: "-Xms1g -Xmx1g"
+          resources:
+            limits:
+              memory: {{ .Values.elasticsearch.resources.limits.memory }}
+              cpu: {{ .Values.elasticsearch.resources.limits.cpu }}
+            requests:
+              memory: {{ .Values.elasticsearch.resources.requests.memory }}
+              cpu: {{ .Values.elasticsearch.resources.requests.cpu }}
+          volumeMounts:
+            - name: config-volume
+              mountPath: /usr/share/elasticsearch/config2/elasticsearch.yml
+              subPath: elasticsearch.yml
+            - name: esdata
+              mountPath: /usr/share/elasticsearch/data
+      volumes:
+        - name: config-volume
+          configMap:
+            name: {{ .Values.elasticsearch.name }}-config
+        - name: esdata
+          {{- if .Values.elasticsearch.storage.emptyDir }}
+          emptyDir: {}
+          {{- else }}
+          persistentVolumeClaim:
+            claimName: elasticsearch-pvc
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.elasticsearch.name }}-service
+  namespace: {{ .Values.elasticsearch.namespace }}
+  labels:
+    app: {{ .Values.elasticsearch.name }}
+spec:
+  selector:
+    app: {{ .Values.elasticsearch.name }}
+  ports:
+    - protocol: TCP
+      name: http
+      port: {{ .Values.elasticsearch.service.ports.http }}
+      targetPort: {{ .Values.elasticsearch.service.ports.http }}
+    - protocol: TCP
+      name: transport
+      port: {{ .Values.elasticsearch.service.ports.transport }}
+      targetPort: {{ .Values.elasticsearch.service.ports.transport }}
+  type: {{ .Values.elasticsearch.service.type }}

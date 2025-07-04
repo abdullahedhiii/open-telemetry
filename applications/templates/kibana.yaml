@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.kibana.name }}-config
+  namespace: {{ .Values.kibana.namespace }}
+  labels:
+    app: {{ .Values.kibana.name }}
+data:
+  kibana.yml: |
+    server.host: "0.0.0.0"
+    server.port: {{ .Values.kibana.service.port }}
+    elasticsearch.hosts: ["{{ .Values.kibana.elasticsearch.hosts }}"]
+    xpack.fleet.enabled: {{ .Values.kibana.config.fleetEnabled }}
+    xpack.apm.enabled: {{ .Values.kibana.config.apmEnabled }}
+    xpack.monitoring.enabled: {{ .Values.kibana.config.monitoringEnabled }}
+    xpack.reporting.enabled: {{ .Values.kibana.config.reportingEnabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.kibana.name }}
+  namespace: {{ .Values.kibana.namespace }}
+spec:
+  replicas: {{ .Values.kibana.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.kibana.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.kibana.name }}
+    spec:
+      containers:
+        - name: {{ .Values.kibana.name }}
+          image: {{ .Values.kibana.image }}
+          ports:
+            - containerPort: {{ .Values.kibana.service.port }}
+          env:
+            - name: ELASTICSEARCH_HOSTS
+              value: {{ .Values.kibana.elasticsearch.hosts | quote }}
+            - name: ELASTICSEARCH_SERVICEACCOUNTTOKEN
+              value: {{ .Values.kibana.elasticsearch.token | quote }}
+            - name: ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES
+              value: {{ .Values.kibana.elasticsearch.cert | quote }}
+            - name: ELASTICSEARCH_SSL_VERIFICATIONMODE
+              value: {{ .Values.kibana.elasticsearch.sslVerificationMode | quote }}
+          resources:
+            limits:
+              memory: {{ .Values.kibana.resources.limits.memory }}
+              cpu: {{ .Values.kibana.resources.limits.cpu }}
+            requests:
+              memory: {{ .Values.kibana.resources.requests.memory }}
+              cpu: {{ .Values.kibana.resources.requests.cpu }}
+          volumeMounts:
+            - name: config-volume
+              mountPath: /usr/share/kibana/config/kibana.yml
+              subPath: kibana.yml
+            - name: es-ca-cert
+              mountPath: /usr/share/kibana/config/certs
+              readOnly: true
+      volumes:
+        - name: config-volume
+          configMap:
+            name: {{ .Values.kibana.name }}-config
+        - name: es-ca-cert
+          secret:
+            secretName: es-ca-cert
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.kibana.name }}-service
+  namespace: {{ .Values.kibana.namespace }}
+  labels:
+    app: {{ .Values.kibana.name }}
+spec:
+  selector:
+    app: {{ .Values.kibana.name }}
+  ports:
+    - protocol: TCP
+      name: http
+      port: {{ .Values.kibana.service.port }}
+      targetPort: {{ .Values.kibana.service.port }}
+  type: {{ .Values.kibana.service.type }}
