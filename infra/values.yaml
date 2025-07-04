@@ -85,6 +85,9 @@ fluentd:
     password: edhi12
     sslVerify: false
 
+
+
+# Updated values.yaml section for otelCollector
 otelCollector:
   replicaCount: 1
   name: otel-collector
@@ -139,8 +142,14 @@ otelCollector:
         loglevel: info
       prometheus:
         endpoint: "0.0.0.0:9464"
+        namespace: "otelcol"
+        const_labels:
+          service: "otel-collector"
+        resource_to_telemetry_conversion:
+          enabled: true
 
     service:
+      # Remove duplicate telemetry configuration
       pipelines:
         traces:
           receivers: [otlp]

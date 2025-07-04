@@ -43,7 +43,7 @@ kubectl create secret generic elasticsearch-master-credentials \
 
   kubectl create secret docker-registry regcred \
   --docker-username=abdullahedhii \
-  --docker-password=abdullah123@ \
+  --docker-password=abdullah123@@ \
   --docker-email=abdullah.edhi@foundri.net
 
 

@@ -1,48 +1,47 @@
+# Option 1: If using prometheus-community/prometheus chart
 prometheus:
   replicaCount: 1
   
   alertmanager:
-   enabled: false
+    enabled: false
 
   prometheus-pushgateway:
-   enabled: false
+    enabled: false
 
   kube-state-metrics:
-   enabled: false
+    enabled: false
 
   prometheus-node-exporter:
-   enabled: false
+    enabled: false
 
-  
   server:
-   nameOverride: prometheus
-   fullnameOverride: prometheus-service
-   enabled: true
-   service:
-    type: ClusterIP
-    port: 9090
-    targetPort: 9090
+    nameOverride: prometheus
+    fullnameOverride: prometheus-service
+    enabled: true
+    service:
+      type: ClusterIP
+      port: 9090
+      targetPort: 9090
 
-   extraScrapeConfigs:
-    - job_name: 'otel-collector-system-metrics'
-      static_configs:
-        - targets: ['otel-collector-service:9464']
+    persistentVolume:
+      enabled: false
 
-    - job_name: 'cadvisor'
-      static_configs:
-        - targets: ['cadvisor-service:8080']
+  extraScrapeConfigs: |
+      - job_name: 'otel-collector-system-metrics'
+        metrics_path: '/metrics'
+        static_configs:
+          - targets: 
+             - otel-collector-service:9464
 
-    - job_name: 'prometheus'
-      static_configs:
-        - targets: ['localhost:9090']
+      - job_name: 'cadvisor'
+        static_configs:
+          - targets: 
+              - cadvisor-service:8080
 
-    - job_name: 'backend'
-      static_configs:
-        - targets: ['backend-service:2222']
- 
-   persistentVolume:
-     enabled: false
-
+      # - job_name: 'backend'
+      #   static_configs:
+      #     - targets: 
+      #        - backend-service:2222
 
 frontend:
   labels:
@@ -120,7 +119,7 @@ kibana:
       cpu: "500m"
   elasticsearch:
     hosts: https://elasticsearch-service:9200
-    token: AAEAAWVsYXN0aWMva2liYW5hL2tpYmFuYS10b2tlbjpoc0ZvWmJGaVNXR25yRkdaWWxxaWh3
+    token: AAEAAWVsYXN0aWMva2liYW5hL2tpYmFuYS10b2tlbjpmdDloUmRrRFJwQ08wa084c2R3NG1B
     cert: /usr/share/kibana/config/certs/http_ca.crt
     sslVerificationMode: none
   config:
@@ -206,16 +205,16 @@ ingress:
           pathType: Prefix
           serviceName: prometheus-service
           servicePort: 9090
-    # - host: otel-collector.127.0.0.1.sslip.io
-    #   paths:
-    #     - path: /v1/traces
-    #       pathType: Prefix
-    #       serviceName: otel-collector-service
-    #       servicePort: 4318
-    #     - path: /v1/metrics
-    #       pathType: Prefix
-    #       serviceName: otel-collector-service
-    #       servicePort: 4318
+    - host: otel-collector.127.0.0.1.sslip.io
+      paths:
+        - path: /v1/traces
+          pathType: Prefix
+          serviceName: otel-collector-service
+          servicePort: 4318
+        - path: /v1/metrics
+          pathType: Prefix
+          serviceName: otel-collector-service
+          servicePort: 4318
     # - host: cadvisor.127.0.0.1.sslip.io
     #   paths:
     #     - path: /
