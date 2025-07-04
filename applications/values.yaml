@@ -1,4 +1,3 @@
-# Option 1: If using prometheus-community/prometheus chart
 prometheus:
   replicaCount: 1
   
@@ -42,6 +41,27 @@ prometheus:
       #   static_configs:
       #     - targets: 
       #        - backend-service:2222
+
+grafana:
+  fullnameOverride: grafana-service
+
+  operator:
+    enabled: false
+
+  admin:
+    user: admin
+    password: admin  # Will be required again on future upgrades unless using a custom secret
+
+  grafana:
+    service:
+      type: ClusterIP
+      port: 3000
+
+    persistence:
+      enabled: true
+      size: 1Gi
+      storageClass: Standard
+
 
 frontend:
   labels:
@@ -175,6 +195,13 @@ ingress:
   enabled: true
   name: app-ingress
   rules:
+    - host: grafana.127.0.0.1.sslip.io
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: grafana-service
+          servicePort: 3000
+
     - host: frontend.127.0.0.1.sslip.io
       paths:
         - path: /

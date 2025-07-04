@@ -14,5 +14,11 @@ dependencies:
   - name: jaeger
     version: 3.4.1 
     repository: https://jaegertracing.github.io/helm-charts
+  - name: grafana
+    version: 12.0.8
+    repository: https://charts.bitnami.com/bitnami
+  - name: cadvisor
+    version: 0.1.10
+    repository: https://charts.bitnami.com/bitnami
 
 appVersion: "1.16.0"
