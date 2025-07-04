@@ -84,3 +84,4 @@ fluentd:
     user: abdullah
     password: edhi12
     sslVerify: false
+

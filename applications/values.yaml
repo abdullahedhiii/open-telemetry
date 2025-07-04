@@ -82,3 +82,54 @@ kibana:
     apmEnabled: false
     monitoringEnabled: false
     reportingEnabled: false
+
+ingress:
+  enabled: true
+  name: app-ingress
+  rules:
+    - host: frontend.127.0.0.1.sslip.io
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: frontend-service
+          servicePort: 6600
+    - host: backend.127.0.0.1.sslip.io
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: backend-service
+          servicePort: 8000
+    - host: kibana.127.0.0.1.sslip.io
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: kibana-service
+          servicePort: 5601
+    # - host: jaeger.127.0.0.1.sslip.io
+    #   paths:
+    #     - path: /
+    #       pathType: Prefix
+    #       serviceName: jaeger-service
+    #       servicePort: 16686
+    # - host: prometheus.127.0.0.1.sslip.io
+    #   paths:
+    #     - path: /
+    #       pathType: Prefix
+    #       serviceName: prometheus-service
+    #       servicePort: 9090
+    # - host: otel-collector.127.0.0.1.sslip.io
+    #   paths:
+    #     - path: /v1/traces
+    #       pathType: Prefix
+    #       serviceName: otel-collector-service
+    #       servicePort: 4318
+    #     - path: /v1/metrics
+    #       pathType: Prefix
+    #       serviceName: otel-collector-service
+    #       servicePort: 4318
+    # - host: cadvisor.127.0.0.1.sslip.io
+    #   paths:
+    #     - path: /
+    #       pathType: Prefix
+    #       serviceName: cadvisor-service
+    #       servicePort: 8080
