@@ -120,7 +120,7 @@ kibana:
       cpu: "500m"
   elasticsearch:
     hosts: https://elasticsearch-service:9200
-    token: AAEAAWVsYXN0aWMva2liYW5hL2tpYmFuYS10b2tlbjprSGdKYVdiZlFTU1FlZGxaQ1B1clNB
+    token: AAEAAWVsYXN0aWMva2liYW5hL2tpYmFuYS10b2tlbjpoc0ZvWmJGaVNXR25yRkdaWWxxaWh3
     cert: /usr/share/kibana/config/certs/http_ca.crt
     sslVerificationMode: none
   config:
@@ -169,6 +169,7 @@ jaeger:
 
  storage:
   type: memory
+
 
 
 ingress:

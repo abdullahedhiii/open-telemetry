@@ -1,0 +1,62 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.otelCollector.name  }}-config
+data:
+  otel-collector-config.yaml: |
+{{ .Values.otelCollector.config | toYaml | indent 4 }}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.otelCollector.name  }}
+spec:
+  replicas: {{ .Values.otelCollector.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.otelCollector.name  }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.otelCollector.name  }}
+    spec:
+      containers:
+        - name: otel-collector
+          image: {{ .Values.otelCollector.image.repository }}:{{ .Values.otelCollector.image.tag }}
+          imagePullPolicy: {{ .Values.otelCollector.image.pullPolicy }}
+          args: ["--config=/etc/otel-collector/otel-collector-config.yaml"]
+          ports:
+            - containerPort: 4317
+              name: otlp-grpc
+            - containerPort: 4318
+              name: otlp-http
+            - containerPort: 9464
+              name: prom-metrics
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/otel-collector
+      volumes:
+        - name: config-volume
+          configMap:
+            name: {{ .Values.otelCollector.name  }}-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.otelCollector.name  }}-service
+spec:
+  selector:
+    app: {{ .Values.otelCollector.name  }}
+  ports:
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+    - name: prometheus
+      port: 9464
+      targetPort: 9464

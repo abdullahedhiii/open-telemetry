@@ -85,3 +85,69 @@ fluentd:
     password: edhi12
     sslVerify: false
 
+otelCollector:
+  replicaCount: 1
+  name: otel-collector
+  image:
+    repository: otel/opentelemetry-collector-contrib
+    tag: 0.101.0
+    pullPolicy: IfNotPresent
+
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: "0.0.0.0:4317"
+          http:
+            endpoint: "0.0.0.0:4318"
+            cors:
+              allowed_origins:
+                - "http://localhost:5173"
+                - "http://backend.127.0.0.1.sslip.io"
+                - "http://frontend.127.0.0.1.sslip.io"
+                - "http://grafana.127.0.0.1.sslip.io"
+              allowed_headers:
+                - "Content-Type"
+                - "traceparent"
+                - "tracestate"
+                - "baggage"
+                - "x-client-trace-id"
+
+      hostmetrics:
+        collection_interval: 10s
+        scrapers:
+          cpu: {}
+          memory: {}
+          disk: {}
+          filesystem: {}
+          network: {}
+          load: {}
+
+    processors:
+      batch:
+        timeout: 1s
+        send_batch_size: 1024
+        send_batch_max_size: 2048
+
+    exporters:
+      otlp:
+        endpoint: "jaeger-service-collector:4317"
+        tls:
+          insecure: true
+      logging:
+        loglevel: info
+      prometheus:
+        endpoint: "0.0.0.0:9464"
+
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [otlp, logging]
+
+        metrics:
+          receivers: [otlp, hostmetrics]
+          processors: [batch]
+          exporters: [prometheus]
