@@ -1,6 +1,6 @@
 <script setup>
 import { tracer } from '../tracing.js'
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { context, propagation, trace } from '@opentelemetry/api'
 import {logFrontendEvent} from "../logger.js"
 
@@ -9,17 +9,16 @@ const error = ref(null)
 const loading = ref(false)
 const watchlist = ref([])
 const searchQuery = ref('')
-const sortBy = ref('symbol')
-const sortOrder = ref('asc')
+const filteredSymbols = ref([])
 
 async function fetchWatchlist() {
   const userId = JSON.parse(localStorage.getItem("userData")).ID
-  logFrontendEvent({
+    logFrontendEvent({
     event: 'fetch_watchlist',
     type: 'Success',
     metadata: {
       userId,
-      pageContext: 'Stocks_View'
+      pageContext: 'Stock_View'
     },
     span: null
   })
@@ -35,17 +34,15 @@ async function fetchWatchlist() {
   const ctx = trace.setSpan(context.active(), mainSpan)
   const headers = {}
   propagation.inject(ctx, headers)
-  
-  logFrontendEvent({
+logFrontendEvent({
     event: 'fetch_watchlist_start',
     type: 'Success',
     metadata: {
       userId,
-      pageContext: 'Stocks_View'
+      pageContext: 'Stock_View'
     },
     span: mainSpan
   })
-
   try {
     const apiUrl = import.meta.env.VITE_API_URL
     const fullUrl = `${apiUrl}/watchlist/${userId}`
@@ -60,17 +57,15 @@ async function fetchWatchlist() {
         'user.agent': navigator.userAgent
       }
     })
-
-   logFrontendEvent({
+ logFrontendEvent({
     event: 'fetch_watchlist_request_sent',
     type: 'Success',
     metadata: {
       userId,
-      pageContext: 'Stocks_View'
+      pageContext: 'Stock_View'
     },
     span: httpSpan
   })
-
     const response = await fetch(fullUrl, {
       method: 'GET',
       headers
@@ -84,13 +79,11 @@ async function fetchWatchlist() {
     type: 'Error',
     metadata: {
       userId,
-      pageContext: 'Stocks_View',
-      error: 'Response not ok'
-    },
-    span: httpSpan
-  })
-
+      pageContext: 'Stock_View',
+      error: 'Response not ok',}})
+  
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      
     }
 
     const processingSpan = tracer.startSpan('process_watchlist_data', {
@@ -101,19 +94,22 @@ async function fetchWatchlist() {
     })
 
     const result = await response.json()
-    const items = Array.isArray(result) ? result : result.watchlist || []
-
-    watchlist.value = items.filter(item => item.Type == 'STOCK').map(item=> item.Symbol)
+    // console.log(result)
+    const items = Array.isArray(result) ? result :  []
  logFrontendEvent({
     event: 'processing watchlist',
     type: 'Success',
     metadata: {
       userId,
-      pageContext: 'Stocks_View'
+      pageContext: 'Stock_View'
     },
     span: processingSpan
   })
 
+watchlist.value = items
+  .filter(item => item.Type === 'STOCK')
+  .map(item => ({ Symbol: item.Symbol }))
+    console.log(watchlist.value)
     processingSpan.setAttributes({
       'watchlist.items_total': items.length
     })
@@ -127,8 +123,9 @@ async function fetchWatchlist() {
       'watchlist.items_count': watchlist.value.length,
       'operation.success': true
     })
+
     mainSpan.setStatus({ code: 1 })
- logFrontendEvent({
+logFrontendEvent({
     event: 'watchlist fetched and processed',
     type: 'Success',
     metadata: {
@@ -137,7 +134,6 @@ async function fetchWatchlist() {
     },
     span: mainSpan
   })
-
   } catch (err) {
     console.error("Error fetching watchlist:", err)
     mainSpan.setAttributes({
@@ -154,70 +150,19 @@ async function fetchWatchlist() {
     },
     span: mainSpan
   })
-
     mainSpan.setStatus({ code: 2, message: err.message })
   } finally {
     mainSpan.end()
   }
 }
 
-const filteredAndSortedSymbols = computed(() => {
-  const span = tracer.startSpan('filter_and_sort_stocks', {
-    attributes: {
-      'search.query': searchQuery.value,
-      'sort.by': sortBy.value,
-      'sort.order': sortOrder.value,
-      'stocks.total_count': symbols.value.length
-    }
-  })
-  
-  try {
-    let filtered = symbols.value
-    
-    if (searchQuery.value.trim()) {
-      filtered = symbols.value.filter(stock => 
-        stock.Symbol?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-        stock.Name?.toLowerCase().includes(searchQuery.value.toLowerCase())
-      )
-    }
-    
-    filtered.sort((a, b) => {
-      let aValue = sortBy.value === 'symbol' ? a.Symbol : a.Name || ''
-      let bValue = sortBy.value === 'symbol' ? b.Symbol : b.Name || ''
-      
-      aValue = aValue.toLowerCase()
-      bValue = bValue.toLowerCase()
-      
-      if (sortOrder.value === 'asc') {
-        return aValue.localeCompare(bValue)
-      } else {
-        return bValue.localeCompare(aValue)
-      }
-    })
-    
-    span.setAttributes({
-      'stocks.filtered_count': filtered.length,
-      'filter.has_results': filtered.length > 0,
-      'operation.success': true
-    })
-    
-    span.setStatus({ code: 1 })
-    return filtered
-  } catch (err) {
-    span.setStatus({ code: 2, message: err.message })
-    return symbols.value
-  } finally {
-    span.end()
-  }
-})
 
 async function fetchSymbols() {
   const mainSpan = tracer.startSpan('fetchStockSymbols', {
     attributes: {
       'operation.type': 'data_fetch',
-      'component': 'stock_dashboard',
-      'user.action': 'fetch_symbols',
-      'data.source': 'stocks_api'
+      'component': 'Stock_dashboard',
+      'user.action': 'fetch_symbols'
     }
   })
   
@@ -237,21 +182,18 @@ async function fetchSymbols() {
     
     const apiUrl = import.meta.env.VITE_API_URL || ""
     const fullUrl = `${apiUrl}/stocks/symbols`
-    console.log(apiUrl)
+    
     mainSpan.setAttributes({
       'api.url': fullUrl,
       'http.method': 'GET',
-      'api.endpoint': '/stocks/symbols',
-      'api.version': 'v1'
+      'api.endpoint': '/stocks/symbols'
     })
     
-    
-    const httpSpan = tracer.startSpan('http_request_stocks', {
-      parent: trace.setSpan(context.active(), mainSpan),
+    const httpSpan = tracer.startSpan('http_request', {
+      parent: mainSpan,
       attributes: {
         'http.url': fullUrl,
-        'http.method': 'GET',
-        'http.user_agent': navigator.userAgent
+        'http.method': 'GET'
       }
     })
     
@@ -265,8 +207,7 @@ async function fetchSymbols() {
     
     httpSpan.setAttributes({
       'http.status_code': response.status,
-      'http.response_time_ms': duration,
-      'http.response_size_bytes': response.headers.get('content-length') || 0
+      'http.response_time_ms': duration
     })
     
     mainSpan.setAttributes({
@@ -278,33 +219,24 @@ async function fetchSymbols() {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
     
-    
-    const processingSpan = tracer.startSpan('process_stock_data', {
-      parent: trace.setSpan(context.active(), httpSpan),
-      attributes: {
-        'processing.type': 'json_parse_and_validate'
-      }
+    const processingSpan = tracer.startSpan('process_response_data', {
+       parent: mainSpan,
     })
     
     const data = await response.json()
     const processedSymbols = Array.isArray(data) ? data : data.symbols || []
-    
-    
-    const validSymbols = processedSymbols.filter(stock => stock.Symbol)
-    
+    console.log(processedSymbols)
     processingSpan.setAttributes({
       'data.symbols_count': processedSymbols.length,
-      'data.valid_symbols_count': validSymbols.length,
-      'data.invalid_symbols_count': processedSymbols.length - validSymbols.length,
       'data.processing_time_ms': performance.now() - endTime
     })
     
-    symbols.value = validSymbols
+    symbols.value = processedSymbols
+    filteredSymbols.value = processedSymbols
     
     mainSpan.setAttributes({
-      'symbols.count': validSymbols.length,
-      'operation.success': true,
-      'data.quality_score': validSymbols.length / processedSymbols.length
+      'symbols.count': processedSymbols.length,
+      'operation.success': true
     })
     
     httpSpan.setStatus({ code: 1 })
@@ -320,56 +252,47 @@ async function fetchSymbols() {
     mainSpan.setAttributes({
       'error.message': err.message,
       'error.type': err.constructor.name,
-      'error.stack': err.stack,
       'operation.success': false
     })
     
     mainSpan.setStatus({ code: 2, message: err.message })
   } finally {
     loading.value = false
-    mainSpan.setAttribute('fetch.end_time', performance.now())
     mainSpan.end()
   }
 }
 
-function viewDetails(symbol, name) {
-  const span = tracer.startSpan('view_stock_details', {
+function viewDetails(symbolId, symbolName) {
+  const span = tracer.startSpan('view_symbol_details', {
     attributes: {
-      'stock.symbol': symbol,
-      'stock.name': name,
-      'user.action': 'view_details',
-      'interaction.type': 'button_click'
+      'symbol.id': symbolId,
+      'symbol.name': symbolName,
+      'user.action': 'view_details'
     }
   })
   
   try {
+    
     span.setAttributes({
       'interaction.timestamp': Date.now(),
-      'page.section': 'stock_table',
-      'user.intent': 'view_stock_information'
+      'page.section': 'symbol_table'
     })
     
-    
-    window.location = '/details/stocks/' + symbol
-    
+    window.location = `/details/stocks/${symbolId}`
     span.setAttributes({
-      'operation.success': true,
-      'modal.opened': true
+      'operation.success': true
     })
     span.setStatus({ code: 1 })
   } catch (err) {
-    span.setAttributes({
-      'error.message': err.message,
-      'operation.success': false
-    })
     span.setStatus({ code: 2, message: err.message })
   } finally {
     span.end()
   }
 }
 
-async function addToWatchlist(symbol) {
-  const span = tracer.startSpan('add_crypto_to_watchlist', {
+
+async function addToWatchlist(symbol,id) {
+  const span = tracer.startSpan('add_stock_to_watchlist', {
     attributes: {
       'stock.symbol': symbol,
       'user.action': 'add_watchlist',
@@ -391,9 +314,8 @@ async function addToWatchlist(symbol) {
 
     const payload = {
       UserID: userId,
-      Type: "STOCK",
+      Type: "STOCKS",
       Symbol: symbol,
-      CryptoId: null
     }
 
     const headers = {}
@@ -416,7 +338,8 @@ async function addToWatchlist(symbol) {
     if (!response.ok) {
       throw new Error(`Failed to add to watchlist: ${response.statusText}`)
     }
-
+    await fetchWatchlist()
+    filterSymbols()
     span.setStatus({ code: 1 })
   } catch (err) {
     console.error("Error adding to watchlist:", err)
@@ -429,7 +352,7 @@ async function addToWatchlist(symbol) {
     span.end()
   }
 }
-async function removeFromWatchlist(symbol) {
+async function removeFromWatchlist(symbol,id) {
   const span = tracer.startSpan('remove_stock_from_watchlist', {
     attributes: {
       'stock.symbol': symbol,
@@ -448,7 +371,7 @@ async function removeFromWatchlist(symbol) {
     const userId = parsedUser.ID 
 
     const apiUrl = import.meta.env.VITE_API_URL
-    const endpoint = `${apiUrl}/watchlist/remove/stock/${userId}/${symbol}`
+    const endpoint = `${apiUrl}/watchlist/remove/stock/${userId}/${id}`
 
     const headers = {}
     const ctx = trace.setSpan(context.active(), span)
@@ -467,7 +390,8 @@ async function removeFromWatchlist(symbol) {
     if (!response.ok) {
       throw new Error(`Failed to remove from watchlist: ${response.statusText}`)
     }
-
+    await fetchWatchlist()
+    filterSymbols()
     span.setStatus({ code: 1 })
   } catch (err) {
     console.error("Error removing from watchlist:", err)
@@ -481,31 +405,33 @@ async function removeFromWatchlist(symbol) {
   }
 }
 
-function isInWatchlist(symbol) {
-  return watchlist.value.includes(symbol)
+
+function isInWatchlist(symbolId) {
+  return watchlist.value.some(cc => cc.Symbol === symbolId)
 }
 
-function updateSort(field) {
-  const span = tracer.startSpan('update_sort_order', {
+
+function filterSymbols() {
+  const span = tracer.startSpan('filter_symbols', {
     attributes: {
-      'sort.field': field,
-      'sort.previous_field': sortBy.value,
-      'sort.previous_order': sortOrder.value
+      'search.query': searchQuery.value,
+      'symbols.total_count': symbols.value.length
     }
   })
   
   try {
-    if (sortBy.value === field) {
-      sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+    if (!searchQuery.value.trim()) {
+      filteredSymbols.value = symbols.value
     } else {
-      sortBy.value = field
-      sortOrder.value = 'asc'
+      filteredSymbols.value = symbols.value.filter(stock => 
+        stock.Symbol?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+        stock.Name?.toLowerCase().includes(searchQuery.value.toLowerCase())
+      )
     }
     
     span.setAttributes({
-      'sort.new_field': sortBy.value,
-      'sort.new_order': sortOrder.value,
-      'operation.success': true
+      'symbols.filtered_count': filteredSymbols.value.length,
+      'filter.has_results': filteredSymbols.value.length > 0
     })
     
     span.setStatus({ code: 1 })
@@ -516,13 +442,12 @@ function updateSort(field) {
   }
 }
 
+
 onMounted(() => {
-  const span = tracer.startSpan('stock_dashboard_mounted', {
+  const span = tracer.startSpan('component_mounted', {
     attributes: {
-      'component': 'stock_dashboard',
-      'lifecycle.event': 'mounted',
-      'page.url': window.location.href,
-      'user.agent': navigator.userAgent
+      'component': 'stoc_dashboard',
+      'lifecycle.event': 'mounted'
     }
   })
   fetchWatchlist()
@@ -536,32 +461,19 @@ onMounted(() => {
     <div class="header-section">
       <div class="header-content">
         <div class="title-section">
-          <h1 class="main-title">Stock Market Symbols</h1>
-          <p class="subtitle">Track and monitor your favorite stock symbols</p>
+          <h1 class="main-title">Stock Symbols</h1>
+          <p class="subtitle">Discover and track your favorite stock assets</p>
         </div>
         
-        <div class="controls-section">
+        <div class="actions-section">
           <div class="search-container">
             <input 
               v-model="searchQuery"
+              @input="filterSymbols"
               type="text"
-              placeholder="Search stocks..."
+              placeholder="Search symbols..."
               class="search-input"
             />
-          </div>
-          
-          <div class="sort-controls">
-            <select v-model="sortBy" class="sort-select">
-              <option value="symbol">Sort by Symbol</option>
-              <option value="name">Sort by Name</option>
-            </select>
-            <button 
-              @click="sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'"
-              class="sort-order-btn"
-              :class="{ 'desc': sortOrder === 'desc' }"
-            >
-              {{ sortOrder === 'asc' ? '↑' : '↓' }}
-            </button>
           </div>
           
           <button 
@@ -570,7 +482,7 @@ onMounted(() => {
             class="fetch-button"
           >
             <span v-if="loading" class="loading-spinner"></span>
-            {{ loading ? 'Loading...' : 'Fetch Stocks' }}
+            {{ loading ? 'Loading...' : 'Fetch Symbols' }}
           </button>
         </div>
       </div>
@@ -579,76 +491,55 @@ onMounted(() => {
     <div v-if="error" class="error-card">
       <div class="error-icon">⚠️</div>
       <div class="error-content">
-        <h3>Unable to fetch stock data</h3>
+        <h3>Something went wrong</h3>
         <p>{{ error }}</p>
-        <button @click="fetchSymbols" class="retry-button">Try Again</button>
       </div>
     </div>
 
-    <div v-if="filteredAndSortedSymbols.length > 0" class="table-section">
+    <div v-if="filteredSymbols.length > 0" class="table-section">
       <div class="table-header">
-        <h2>Stock Symbols</h2>
-        <div class="table-stats">
-          <span class="symbol-count">{{ filteredAndSortedSymbols.length }} of {{ symbols.length }} symbols</span>
-          <span v-if="searchQuery" class="search-indicator">Filtered by: "{{ searchQuery }}"</span>
-        </div>
+        <h2>Available Symbols</h2>
+        <span class="symbol-count">{{ filteredSymbols.length }} symbols</span>
       </div>
       
       <div class="table-container">
-        <table class="stocks-table">
+        <table class="symbols-table">
           <thead>
             <tr>
-              <th @click="updateSort('symbol')" class="sortable-header">
-                <div class="header-content">
-                  Symbol
-                  <span v-if="sortBy === 'symbol'" class="sort-indicator">
-                    {{ sortOrder === 'asc' ? '↑' : '↓' }}
-                  </span>
-                </div>
-              </th>
-              <th @click="updateSort('name')" class="sortable-header">
-                <div class="header-content">
-                  Company Name
-                  <span v-if="sortBy === 'name'" class="sort-indicator">
-                    {{ sortOrder === 'asc' ? '↑' : '↓' }}
-                  </span>
-                </div>
-              </th>
+              <th>Symbol</th>
+              <th>Name</th>
               <th class="actions-header">Actions</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="stock in filteredAndSortedSymbols" :key="stock.Symbol" class="stock-row">
+            <tr v-for="stock in filteredSymbols" :key="stock.Id" class="symbol-row">
               <td class="symbol-cell">
                 <div class="symbol-badge">{{ stock.Symbol }}</div>
               </td>
               <td class="name-cell">
-                <span class="company-name">{{ stock.Name || 'N/A' }}</span>
+                <span class="symbol-name">{{ stock.Name || 'N/A' }}</span>
               </td>
               <td class="actions-cell">
                 <div class="action-buttons">
                   <button 
-                    @click="viewDetails(stock.Symbol, stock.Name)"
+                    @click="viewDetails(stock.Id, stock.Symbol)"
                     class="action-button view-button"
-                    :title="`View details for ${stock.Symbol}`"
                   >
                     View Details
                   </button>
                   
                   <button 
-                    v-if="!isInWatchlist(stock.Symbol)"
-                    @click="addToWatchlist(stock.Symbol)"
+                    v-if="!isInWatchlist(stock.Id)"
+                    @click="addToWatchlist(stock.Symbol,stock.Id)"
                     class="action-button add-button"
-                    :title="`Add ${stock.Symbol} to watchlist`"
                   >
                     Add to List
                   </button>
                   
                   <button 
                     v-else
-                    @click="removeFromWatchlist(stock.Symbol)"
+                    @click="removeFromWatchlist(stock.Symbol,stock.Id)"
                     class="action-button remove-button"
-                    :title="`Remove ${stock.Symbol} from watchlist`"
                   >
                     Remove
                   </button>
@@ -662,49 +553,32 @@ onMounted(() => {
 
     <div v-if="watchlist.length > 0" class="watchlist-section">
       <div class="watchlist-header">
-        <h2>Your Stock Watchlist</h2>
-        <div class="watchlist-stats">
-          <span class="watchlist-count">{{ watchlist.length }} stocks</span>
-          <button @click="watchlist = []" class="clear-watchlist-btn">Clear All</button>
-        </div>
+        <h2>Your Watchlist</h2>
+        <span class="watchlist-count">{{ watchlist.length }} items</span>
       </div>
       
       <div class="watchlist-grid">
         <div 
-          v-for="symbol in watchlist" 
-          :key="symbol" 
+          v-for="cc in watchlist" 
+          :key="cc.Symbol" 
           class="watchlist-item"
         >
-          <div class="watchlist-symbol">{{ symbol }}</div>
-          <div class="watchlist-actions">
-            <button 
-              @click="viewDetails(symbol)"
-              class="watchlist-view-btn"
-              :title="`View ${symbol} details`"
-            >
-              👁️
-            </button>
-            <button 
-              @click="removeFromWatchlist(symbol)"
-              class="watchlist-remove-btn"
-              :title="`Remove ${symbol} from watchlist`"
-            >
-              ×
-            </button>
-          </div>
+          <span class="watchlist-symbol">{{ cc.Symbol }}</span>
+          <button 
+            @click="removeFromWatchlist(cc.Symbol)"
+            class="remove-from-watchlist"
+          >
+            ×
+          </button>
         </div>
       </div>
     </div>
 
-    <div v-if="!loading && filteredAndSortedSymbols.length === 0 && !error" class="empty-state">
-      <div class="empty-icon">📈</div>
-      <h3>{{ searchQuery ? 'No matching stocks found' : 'No stock data available' }}</h3>
-      <p v-if="searchQuery">Try adjusting your search terms or clear the search filter</p>
-      <p v-else>Click "Fetch Stocks" to load stock market data</p>
-      <div class="empty-actions">
-        <button v-if="searchQuery" @click="searchQuery = ''" class="clear-search-btn">Clear Search</button>
-        <button v-if="!symbols.length" @click="fetchSymbols" class="fetch-data-btn">Fetch Stock Data</button>
-      </div>
+    <div v-if="!loading && filteredSymbols.length === 0 && !error" class="empty-state">
+      <div class="empty-icon">📊</div>
+      <h3>No symbols found</h3>
+      <p v-if="searchQuery">Try adjusting your search terms</p>
+      <p v-else>Click "Fetch Symbols" to load stock data</p>
     </div>
   </div>
 </template>
@@ -754,11 +628,10 @@ onMounted(() => {
   font-weight: 400;
 }
 
-.controls-section {
+.actions-section {
   display: flex;
   gap: 1rem;
   align-items: center;
-  flex-wrap: wrap;
 }
 
 .search-container {
@@ -770,65 +643,20 @@ onMounted(() => {
   border: 2px solid #e2e8f0;
   border-radius: 12px;
   font-size: 1rem;
-  width: 200px;
+  width: 250px;
   transition: all 0.2s ease;
   background: #f8fafc;
 }
 
 .search-input:focus {
   outline: none;
-  border-color: #10b981;
+  border-color: #3b82f6;
   background: white;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
-}
-
-.sort-controls {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.sort-select {
-  padding: 0.75rem;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
-  font-size: 0.875rem;
-  background: #f8fafc;
-  cursor: pointer;
-}
-
-.sort-select:focus {
-  outline: none;
-  border-color: #10b981;
-  background: white;
-}
-
-.sort-order-btn {
-  background: #f1f5f9;
-  border: 2px solid #e2e8f0;
-  border-radius: 8px;
-  width: 40px;
-  height: 40px;
-  cursor: pointer;
-  font-size: 1.2rem;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.sort-order-btn:hover {
-  background: #e2e8f0;
-}
-
-.sort-order-btn.desc {
-  background: #10b981;
-  color: white;
-  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .fetch-button {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
   color: white;
   border: none;
   padding: 0.75rem 1.5rem;
@@ -846,7 +674,7 @@ onMounted(() => {
 
 .fetch-button:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
 }
 
 .fetch-button:disabled {
@@ -893,23 +721,8 @@ onMounted(() => {
 }
 
 .error-content p {
-  margin: 0 0 1rem 0;
+  margin: 0;
   color: #991b1b;
-}
-
-.retry-button {
-  background: #dc2626;
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.retry-button:hover {
-  background: #b91c1c;
 }
 
 .table-section {
@@ -937,24 +750,9 @@ onMounted(() => {
   color: #1e293b;
 }
 
-.table-stats {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-}
-
 .symbol-count {
-  background: #dcfce7;
-  color: #166534;
-  padding: 0.25rem 0.75rem;
-  border-radius: 20px;
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.search-indicator {
-  background: #dbeafe;
-  color: #1e40af;
+  background: #e0e7ff;
+  color: #3730a3;
   padding: 0.25rem 0.75rem;
   border-radius: 20px;
   font-size: 0.875rem;
@@ -965,38 +763,16 @@ onMounted(() => {
   overflow-x: auto;
 }
 
-.stocks-table {
+.symbols-table {
   width: 100%;
   border-collapse: collapse;
 }
 
-.stocks-table thead {
+.symbols-table thead {
   background: #f1f5f9;
 }
 
-.sortable-header {
-  cursor: pointer;
-  user-select: none;
-  transition: background-color 0.2s ease;
-}
-
-.sortable-header:hover {
-  background: #e2e8f0;
-}
-
-.header-content {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.sort-indicator {
-  font-size: 0.875rem;
-  color: #10b981;
-  font-weight: bold;
-}
-
-.stocks-table th {
+.symbols-table th {
   padding: 1rem 1.5rem;
   text-align: left;
   font-weight: 600;
@@ -1011,15 +787,15 @@ onMounted(() => {
   text-align: center;
 }
 
-.stock-row {
+.symbol-row {
   transition: background-color 0.2s ease;
 }
 
-.stock-row:hover {
+.symbol-row:hover {
   background: #f8fafc;
 }
 
-.stocks-table td {
+.symbols-table td {
   padding: 1rem 1.5rem;
   border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
@@ -1030,7 +806,7 @@ onMounted(() => {
 }
 
 .symbol-badge {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
   color: white;
   padding: 0.5rem 1rem;
   border-radius: 8px;
@@ -1046,7 +822,7 @@ onMounted(() => {
   font-size: 0.875rem;
 }
 
-.company-name {
+.symbol-name {
   font-weight: 500;
 }
 
@@ -1130,12 +906,6 @@ onMounted(() => {
   color: #1e293b;
 }
 
-.watchlist-stats {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-}
-
 .watchlist-count {
   background: #fef3c7;
   color: #92400e;
@@ -1145,26 +915,9 @@ onMounted(() => {
   font-weight: 500;
 }
 
-.clear-watchlist-btn {
-  background: #fee2e2;
-  color: #dc2626;
-  border: 1px solid #fecaca;
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.clear-watchlist-btn:hover {
-  background: #dc2626;
-  color: white;
-}
-
 .watchlist-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 1rem;
 }
 
@@ -1181,51 +934,31 @@ onMounted(() => {
 
 .watchlist-item:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
 }
 
 .watchlist-symbol {
   font-weight: 600;
   color: #0369a1;
-  font-size: 1rem;
 }
 
-.watchlist-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.watchlist-view-btn, .watchlist-remove-btn {
-  background: transparent;
+.remove-from-watchlist {
+  background: #fee2e2;
+  color: #dc2626;
   border: none;
   border-radius: 50%;
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   cursor: pointer;
   font-size: 1rem;
+  font-weight: bold;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
 }
 
-.watchlist-view-btn {
-  background: #e0f2fe;
-  color: #0369a1;
-}
-
-.watchlist-view-btn:hover {
-  background: #0369a1;
-  color: white;
-}
-
-.watchlist-remove-btn {
-  background: #fee2e2;
-  color: #dc2626;
-  font-weight: bold;
-}
-
-.watchlist-remove-btn:hover {
+.remove-from-watchlist:hover {
   background: #dc2626;
   color: white;
 }
@@ -1252,45 +985,9 @@ onMounted(() => {
 }
 
 .empty-state p {
-  margin: 0 0 1.5rem 0;
+  margin: 0;
   color: #64748b;
   font-size: 1.125rem;
-}
-
-.empty-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-}
-
-.clear-search-btn, .fetch-data-btn {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 12px;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: 600;
-  transition: all 0.2s ease;
-}
-
-.clear-search-btn {
-  background: #f1f5f9;
-  color: #475569;
-  border: 1px solid #e2e8f0;
-}
-
-.clear-search-btn:hover {
-  background: #e2e8f0;
-}
-
-.fetch-data-btn {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  color: white;
-}
-
-.fetch-data-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
 }
 
 /* Responsive Design */
@@ -1300,8 +997,12 @@ onMounted(() => {
     align-items: stretch;
   }
   
-  .controls-section {
+  .actions-section {
     justify-content: space-between;
+  }
+  
+  .search-input {
+    width: 200px;
   }
 }
 
@@ -1318,7 +1019,7 @@ onMounted(() => {
     font-size: 2rem;
   }
   
-  .controls-section {
+  .actions-section {
     flex-direction: column;
     gap: 1rem;
   }
@@ -1331,23 +1032,13 @@ onMounted(() => {
     flex-direction: column;
   }
   
-  .stocks-table th,
-  .stocks-table td {
+  .symbols-table th,
+  .symbols-table td {
     padding: 0.75rem;
   }
   
   .watchlist-grid {
     grid-template-columns: 1fr;
-  }
-  
-  .table-header {
-    flex-direction: column;
-    gap: 1rem;
-    align-items: stretch;
-  }
-  
-  .table-stats {
-    justify-content: center;
   }
 }
 </style>

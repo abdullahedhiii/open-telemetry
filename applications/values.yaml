@@ -261,7 +261,7 @@ cadvisor:
   varRun: true
   sys: true
   varLibDocker: true
-  devDisk: false  # Not in your manifest
+  devDisk: false  
 
  service:
   enabled: true

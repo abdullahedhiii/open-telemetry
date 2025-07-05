@@ -130,7 +130,7 @@ logFrontendEvent({
     type: 'Success',
     metadata: {
       userId,
-      pageContext: 'Stocks_View'
+      pageContext: 'Crypto_View'
     },
     span: mainSpan
   })
@@ -145,7 +145,7 @@ logFrontendEvent({
     type: 'Error',
     metadata: {
       userId,
-      pageContext: 'Stocks_View',
+      pageContext: 'Crypto_View',
       error :err
     },
     span: mainSpan
@@ -190,7 +190,7 @@ async function fetchSymbols() {
     })
     
     const httpSpan = tracer.startSpan('http_request', {
-      parent: trace.setSpan(context.active(), mainSpan),
+      parent: mainSpan,
       attributes: {
         'http.url': fullUrl,
         'http.method': 'GET'
@@ -220,7 +220,7 @@ async function fetchSymbols() {
     }
     
     const processingSpan = tracer.startSpan('process_response_data', {
-       parent: trace.setSpan(context.active(), httpSpan),
+       parent: mainSpan,
     })
     
     const data = await response.json()
