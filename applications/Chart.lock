@@ -8,5 +8,8 @@ dependencies:
 - name: grafana
   repository: https://charts.bitnami.com/bitnami
   version: 12.0.8
-digest: sha256:0ac996892c3693153c53e4aee62388fc4109b9a24babf85648bd232652596ef6
-generated: "2025-07-04T16:36:28.554301+05:00"
+- name: cadvisor
+  repository: https://charts.bitnami.com/bitnami
+  version: 0.1.10
+digest: sha256:6f53a0c442ccb606b3628a0debdbe4a075604012d17177c6627a2db5fba0678c
+generated: "2025-07-04T17:23:27.090857+05:00"

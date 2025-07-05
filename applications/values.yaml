@@ -242,9 +242,36 @@ ingress:
           pathType: Prefix
           serviceName: otel-collector-service
           servicePort: 4318
-    # - host: cadvisor.127.0.0.1.sslip.io
-    #   paths:
-    #     - path: /
-    #       pathType: Prefix
-    #       serviceName: cadvisor-service
-    #       servicePort: 8080
+    - host: cadvisor.127.0.0.1.sslip.io
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: cadvisor-service
+          servicePort: 8080
+
+cadvisor:
+ automountServiceAccountToken: false
+ fullnameOverride: cadvisor-service
+
+ containerPorts:
+  http: 8080
+
+ defaultMounts:
+  rootfs: true
+  varRun: true
+  sys: true
+  varLibDocker: true
+  devDisk: false  # Not in your manifest
+
+ service:
+  enabled: true
+  type: ClusterIP
+  ports:
+    http: 8080
+
+ resourcesPreset: small
+ podAnnotations: {}
+
+ nodeSelector: {}
+
+ tolerations: []
