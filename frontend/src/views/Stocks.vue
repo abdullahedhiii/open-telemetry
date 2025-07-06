@@ -11,6 +11,28 @@ const watchlist = ref([])
 const searchQuery = ref('')
 const filteredSymbols = ref([])
 
+function goToCrypto() {
+  const span = tracer.startSpan('navigate_to_crypto', {
+    attributes: {
+      'navigation.target': '/crypto',
+      'user.action': 'navigate',
+      'source.page': 'stocks_dashboard'
+    }
+  })
+  
+  try {
+    window.location.href = '/crypto'
+    span.setAttributes({
+      'operation.success': true
+    })
+    span.setStatus({ code: 1 })
+  } catch (err) {
+    span.setStatus({ code: 2, message: err.message })
+  } finally {
+    span.end()
+  }
+}
+
 async function fetchWatchlist() {
   const userId = JSON.parse(localStorage.getItem("userData")).ID
     logFrontendEvent({
@@ -458,6 +480,15 @@ onMounted(() => {
 
 <template>
   <div class="stock-dashboard">
+     <div class="nav-bar">
+      <button 
+        @click="goToCrypto"
+        class="crypto-nav-button"
+      >
+        🔗 Go to Crypto
+      </button>
+    </div>
+
     <div class="header-section">
       <div class="header-content">
         <div class="title-section">
@@ -584,6 +615,38 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.nav-bar {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 2rem;
+}
+
+.crypto-nav-button {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
+}
+
+.crypto-nav-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+}
+
+.crypto-nav-button:active {
+  transform: translateY(0);
+}
+
 .stock-dashboard {
   max-width: 1400px;
   margin: 0 auto;
