@@ -13,7 +13,7 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
-
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -41,9 +41,21 @@ type ErrorResponse struct {
 	Error   string `json:"error,omitempty"`
 }
 
-func generateJWT(user *User) (string, error)              { return "dummy-jwt", nil }
-func hashPassword(password string) (string, error)        { return "hashed-password", nil }
-func verifyPassword(hashedPassword, password string) bool { return true }
+func generateJWT(user *User) (string, error) { return "dummy-jwt", nil }
+func hashPassword(password string) ([]byte, error) {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return hashedPassword, err
+}
+
+func verifyPassword(hashedPassword []byte, password string) bool {
+	err := bcrypt.CompareHashAndPassword(hashedPassword, []byte(password))
+
+	if err != nil {
+		return true
+	} else {
+		return false
+	}
+}
 
 func loginUser(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Login request received")

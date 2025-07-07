@@ -269,22 +269,22 @@ onMounted(() => {
 <template>
   <div class="app-container">
     <div class="container">
-      <!-- Loading State -->
+      
       <div v-if="loading" class="loading-container">
         <div class="spinner"></div>
         <p>Loading data...</p>
       </div>
 
-      <!-- Error State -->
+      
       <div v-else-if="error" class="error-container">
         <h2>Error Loading Data</h2>
         <p>{{ error }}</p>
         <button @click="fetchData" class="retry-btn">Retry</button>
       </div>
 
-      <!-- Stock Data Display -->
+      
       <div v-else-if="dataType === 'stocks' && stockData" class="content">
-        <!-- Header -->
+        
         <div class="header-card">
           <div class="header-content">
             <h1>{{ stockData.metaData?.symbol || symbol }}</h1>
@@ -313,7 +313,7 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- Recent Performance -->
+        
         <div class="performance-card">
           <h2>Recent Performance</h2>
           <div class="performance-grid">
@@ -336,7 +336,7 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- Historical Data Table -->
+        
         <div class="table-card">
           <h2>Historical Data</h2>
           <div class="table-container">
@@ -366,9 +366,9 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Crypto Data Display -->
+      
       <div v-else-if="dataType === 'crypto' && cryptoData" class="content">
-        <!-- Crypto Header -->
+        
         <div class="header-card crypto-header">
           <div class="crypto-title">
             <img v-if="cryptoData.image" :src="cryptoData.image" :alt="cryptoData.name" class="crypto-icon">
@@ -391,7 +391,7 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- Crypto Stats -->
+        
         <div class="crypto-stats">
           <h2>Market Statistics</h2>
           <div class="stats-grid">
@@ -422,7 +422,7 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- Additional Crypto Info -->
+        
         <div class="crypto-info">
           <h2>Additional Information</h2>
           <div class="info-grid">
@@ -446,7 +446,7 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- No Data State -->
+      
       <div v-else-if="!loading && !error" class="no-data-container">
         <h2>No Data Available</h2>
         <p>Unable to load {{ dataType }} data for {{ symbol }}.</p>

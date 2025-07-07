@@ -22,10 +22,10 @@ var DB *gorm.DB
 
 type User struct {
 	gorm.Model
-	ID       int    `gorm:"primaryKey;autoIncrement"`
+	ID       int    `gorm:"s;autoIncrement"`
 	Username string `gorm:"size:100;unique"`
 	Email    string `gorm:"size:200;unique"`
-	Password string `json:"-"`
+	Password []byte `json:"-"`
 }
 
 type UserSymbols struct {

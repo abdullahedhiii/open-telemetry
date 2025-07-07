@@ -422,26 +422,11 @@ onMounted(() => {
     <div class="hero-section">
       <div class="hero-content">
         <div class="hero-text">
-          <!-- <h1 class="hero-title">
-            Track Your Financial Future
-          </h1> -->
+         
           <p class="hero-subtitle">
             Monitor stocks and cryptocurrencies with real-time data, advanced analytics, and personalized watchlists.
           </p>
-          <!-- <div class="hero-features">
-            <div class="feature-item">
-              <span class="feature-icon">📈</span>
-              <span>Real-time Market Data</span>
-            </div>
-            <div class="feature-item">
-              <span class="feature-icon">⚡</span>
-              <span>Lightning Fast Updates</span>
-            </div>
-            <div class="feature-item">
-              <span class="feature-icon">🔒</span>
-              <span>Secure & Private</span>
-            </div>
-          </div> -->
+         
         </div>
         
         <div class="auth-section">
@@ -455,19 +440,19 @@ onMounted(() => {
               </p>
             </div>
             
-            <!-- Success Message -->
+            
             <div v-if="success" class="success-message">
               <div class="success-icon">✅</div>
               <p>{{ success }}</p>
             </div>
             
-            <!-- Error Message -->
+            
             <div v-if="error" class="error-message">
               <div class="error-icon">⚠️</div>
               <p>{{ error }}</p>
             </div>
             
-            <!-- Login Form -->
+            
             <form v-if="isLoginMode" @submit.prevent="handleLogin" class="auth-form">
               <div class="form-group">
                 <label for="login-email" class="form-label">Email Address</label>
@@ -509,7 +494,7 @@ onMounted(() => {
               </button>
             </form>
             
-            <!-- Register Form -->
+            
             <form v-else @submit.prevent="handleRegister" class="auth-form">
               <div class="form-group">
                 <label for="register-username" class="form-label">Username</label>
@@ -581,7 +566,7 @@ onMounted(() => {
               </button>
             </form>
             
-            <!-- Mode Toggle -->
+            
             <div class="auth-footer">
               <p class="toggle-text">
                 {{ isLoginMode ? "Don't have an account?" : "Already have an account?" }}
@@ -595,7 +580,7 @@ onMounted(() => {
       </div>
     </div>
     
-    <!-- Features Section -->
+    
     <div class="features-section">
       <div class="features-content">
         <h2 class="features-title">Why Choose Our Platform?</h2>
