@@ -131,7 +131,7 @@ logFrontendEvent({
 watchlist.value = items
   .filter(item => item.Type === 'STOCK')
   .map(item => ({ Symbol: item.Symbol }))
-    console.log(watchlist.value)
+  //  console.log(watchlist.value)
     processingSpan.setAttributes({
       'watchlist.items_total': items.length
     })
@@ -189,7 +189,6 @@ async function fetchSymbols() {
   })
   
   const ctx = trace.setSpan(context.active(), mainSpan)
-  
   try {
     error.value = null
     loading.value = true
@@ -240,19 +239,26 @@ async function fetchSymbols() {
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
-    
-    const processingSpan = tracer.startSpan('process_response_data', {
-       parent: mainSpan,
-    })
-    
-    const data = await response.json()
-    const processedSymbols = Array.isArray(data) ? data : data.symbols || []
-    console.log(processedSymbols)
-    processingSpan.setAttributes({
-      'data.symbols_count': processedSymbols.length,
-      'data.processing_time_ms': performance.now() - endTime
-    })
-    
+     await context.with(ctx, async () => {
+      const processingSpan = tracer.startSpan("process_response_data");
+
+      const data = await response.json();
+      processedSymbols = Array.isArray(data) ? data : data.symbols || [];
+
+      processingSpan.setAttributes({
+        'data.symbols_count': processedSymbols.length,
+        'data.processing_time_ms': performance.now() - endTime
+      });
+
+      processingSpan.setStatus({ code: 1 });
+      processingSpan.end();
+
+      // Trace ID debug
+      console.log('main:', mainSpan.spanContext().traceId);
+      console.log('http:', httpSpan.spanContext().traceId);
+      console.log('processing:', processingSpan.spanContext().traceId);
+    });
+
     symbols.value = processedSymbols
     filteredSymbols.value = processedSymbols
     
@@ -262,11 +268,9 @@ async function fetchSymbols() {
     })
     
     httpSpan.setStatus({ code: 1 })
-    processingSpan.setStatus({ code: 1 })
     mainSpan.setStatus({ code: 1 })
     
     httpSpan.end()
-    processingSpan.end()
     
   } catch (err) {
     error.value = err.message
@@ -284,10 +288,11 @@ async function fetchSymbols() {
   }
 }
 
-function viewDetails(symbolId, symbolName) {
+function viewDetails(symbolName) {
+// console.log(symbolName)
   const span = tracer.startSpan('view_symbol_details', {
     attributes: {
-      'symbol.id': symbolId,
+      // 'symbol.id': symbolId,
       'symbol.name': symbolName,
       'user.action': 'view_details'
     }
@@ -300,7 +305,7 @@ function viewDetails(symbolId, symbolName) {
       'page.section': 'symbol_table'
     })
     
-    window.location = `/details/stocks/${symbolId}`
+    window.location.href = `/details/stocks/${symbolName}`
     span.setAttributes({
       'operation.success': true
     })
@@ -313,7 +318,7 @@ function viewDetails(symbolId, symbolName) {
 }
 
 
-async function addToWatchlist(symbol,id) {
+async function addToWatchlist(symbol) {
   const span = tracer.startSpan('add_stock_to_watchlist', {
     attributes: {
       'stock.symbol': symbol,
@@ -364,7 +369,7 @@ async function addToWatchlist(symbol,id) {
     filterSymbols()
     span.setStatus({ code: 1 })
   } catch (err) {
-    console.error("Error adding to watchlist:", err)
+    // console.error("Error adding to watchlist:", err)
     span.setAttributes({
       'operation.success': false,
       'error.message': err.message
@@ -374,7 +379,7 @@ async function addToWatchlist(symbol,id) {
     span.end()
   }
 }
-async function removeFromWatchlist(symbol,id) {
+async function removeFromWatchlist(symbol) {
   const span = tracer.startSpan('remove_stock_from_watchlist', {
     attributes: {
       'stock.symbol': symbol,
@@ -416,7 +421,7 @@ async function removeFromWatchlist(symbol,id) {
     filterSymbols()
     span.setStatus({ code: 1 })
   } catch (err) {
-    console.error("Error removing from watchlist:", err)
+    // console.error("Error removing from watchlist:", err)
     span.setAttributes({
       'error.message': err.message,
       'operation.success': false
@@ -553,7 +558,7 @@ onMounted(() => {
               <td class="actions-cell">
                 <div class="action-buttons">
                   <button 
-                    @click="viewDetails(stock.Id, stock.Symbol)"
+                    @click="viewDetails(stock.Symbol)"
                     class="action-button view-button"
                   >
                     View Details
@@ -561,7 +566,7 @@ onMounted(() => {
                   
                   <button 
                     v-if="!isInWatchlist(stock.Id)"
-                    @click="addToWatchlist(stock.Symbol,stock.Id)"
+                    @click="addToWatchlist(stock.Symbol)"
                     class="action-button add-button"
                   >
                     Add to List
@@ -569,7 +574,7 @@ onMounted(() => {
                   
                   <button 
                     v-else
-                    @click="removeFromWatchlist(stock.Symbol,stock.Id)"
+                    @click="removeFromWatchlist(stock.Symbol)"
                     class="action-button remove-button"
                   >
                     Remove

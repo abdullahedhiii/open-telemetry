@@ -178,7 +178,6 @@ logFrontendEvent({
   }
 }
 
-
 async function fetchSymbols() {
   const mainSpan = tracer.startSpan('fetchCryptoSymbols', {
     attributes: {
@@ -186,103 +185,110 @@ async function fetchSymbols() {
       'component': 'crypto_dashboard',
       'user.action': 'fetch_symbols'
     }
-  })
-  
-  const ctx = trace.setSpan(context.active(), mainSpan)
-  
+  });
+
+  const ctx = trace.setSpan(context.active(), mainSpan);
+
   try {
-    error.value = null
-    loading.value = true
-    
-    
-    const startTime = performance.now()
-    mainSpan.setAttribute('fetch.start_time', startTime)
-    
-    const headers = {}
-    propagation.inject(ctx, headers)
-    headers['Content-Type'] = 'application/json'
-    
-    const apiUrl = import.meta.env.VITE_API_URL || ""
-    const fullUrl = `${apiUrl}/crypto/symbols`
-    
+    error.value = null;
+    loading.value = true;
+
+    const startTime = performance.now();
+    mainSpan.setAttribute('fetch.start_time', startTime);
+
+    const headers = {};
+    propagation.inject(ctx, headers);
+    headers['Content-Type'] = 'application/json';
+
+    const apiUrl = import.meta.env.VITE_API_URL || "";
+    const fullUrl = `${apiUrl}/crypto/symbols`;
+
     mainSpan.setAttributes({
       'api.url': fullUrl,
       'http.method': 'GET',
       'api.endpoint': '/crypto/symbols'
-    })
-    
+    });
+
     const httpSpan = tracer.startSpan('http_request', {
-      parent: mainSpan,
       attributes: {
         'http.url': fullUrl,
         'http.method': 'GET'
       }
-    })
-    
+    });
+
     const response = await fetch(fullUrl, {
       method: 'GET',
       headers: headers
-    })
-    
-    const endTime = performance.now()
-    const duration = endTime - startTime
-    
+    });
+
+    const endTime = performance.now();
+    const duration = endTime - startTime;
+
     httpSpan.setAttributes({
       'http.status_code': response.status,
       'http.response_time_ms': duration
-    })
-    
+    });
+
     mainSpan.setAttributes({
       'http.status_code': response.status,
       'fetch.duration_ms': duration
-    })
-    
+    });
+
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    
-    const processingSpan = tracer.startSpan('process_response_data', {
-       parent: mainSpan,
-    })
-    
-    const data = await response.json()
-    const processedSymbols = Array.isArray(data) ? data : data.symbols || []
-    console.log(processedSymbols)
-    processingSpan.setAttributes({
-      'data.symbols_count': processedSymbols.length,
-      'data.processing_time_ms': performance.now() - endTime
-    })
-    
-    symbols.value = processedSymbols
-    filteredSymbols.value = processedSymbols
-    
+
+    let processedSymbols = [];
+
+    await context.with(ctx, async () => {
+      const processingSpan = tracer.startSpan("process_response_data");
+
+      const data = await response.json();
+      processedSymbols = Array.isArray(data) ? data : data.symbols || [];
+
+      processingSpan.setAttributes({
+        'data.symbols_count': processedSymbols.length,
+        'data.processing_time_ms': performance.now() - endTime
+      });
+
+      processingSpan.setStatus({ code: 1 });
+      processingSpan.end();
+
+      // Trace ID debug
+      console.log('main:', mainSpan.spanContext().traceId);
+      console.log('http:', httpSpan.spanContext().traceId);
+      console.log('processing:', processingSpan.spanContext().traceId);
+    });
+
+    symbols.value = processedSymbols;
+    filteredSymbols.value = processedSymbols;
+
     mainSpan.setAttributes({
       'symbols.count': processedSymbols.length,
       'operation.success': true
-    })
-    
-    httpSpan.setStatus({ code: 1 })
-    processingSpan.setStatus({ code: 1 })
-    mainSpan.setStatus({ code: 1 })
-    
-    httpSpan.end()
-    processingSpan.end()
-    
+    });
+
+    httpSpan.setStatus({ code: 1 });
+    mainSpan.setStatus({ code: 1 });
+
+    httpSpan.end();
+
   } catch (err) {
-    error.value = err.message
-    
+    error.value = err.message;
+
     mainSpan.setAttributes({
       'error.message': err.message,
       'error.type': err.constructor.name,
       'operation.success': false
-    })
-    
-    mainSpan.setStatus({ code: 2, message: err.message })
+    });
+
+    mainSpan.setStatus({ code: 2, message: err.message });
   } finally {
-    loading.value = false
-    mainSpan.end()
+    loading.value = false;
+    mainSpan.end();
   }
 }
+
 
 function viewDetails(symbolId, symbolName) {
   const span = tracer.startSpan('view_symbol_details', {

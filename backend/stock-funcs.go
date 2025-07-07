@@ -19,7 +19,9 @@ import (
 	_ "go.opentelemetry.io/otel/trace"
 )
 
-const apiKey = "26AMBY8WA3V0FCMD"
+// const apiKey = "26AMBY8WA3V0FCMD"
+
+const apiKey = "YCZ6TCTJHAVPNA5Q"
 
 type stockData struct {
 	Symbol string

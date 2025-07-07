@@ -15,6 +15,7 @@ const dataType = computed(() => {
 })
 
 const stockData = computed(() => {
+  // console.log('Stock Data Computed:', detailsData.value)
   if (dataType.value === 'stocks' && detailsData.value && Array.isArray(detailsData.value)) {
     return detailsData.value[0] || null
   }
@@ -30,6 +31,7 @@ const cryptoData = computed(() => {
 
 
 const currentPrice = computed(() => {
+  console.log(stockData.value,'cur')
   if (!stockData.value?.timeSeries) return '0.00'
   const dates = Object.keys(stockData.value.timeSeries).sort().reverse()
   const latestDate = dates[0]
@@ -108,7 +110,8 @@ async function fetchData() {
     headers['Content-Type'] = 'application/json'
     
     const detailsSpan = tracer.startSpan('fetch_symbol_data', { parent: span });
-    
+    console.log('Fetching details for:', symbol.value, 'Type:', type.value);
+    console.log('API URL:', `${import.meta.env.VITE_API_URL}/${type.value}/${symbol.value}`);
     const response = await fetch(`${import.meta.env.VITE_API_URL}/${type.value}/${symbol.value}`,{
       headers: headers
     });
@@ -118,15 +121,18 @@ async function fetchData() {
     }
 
     const responseData = await response.json();
+    console.log(type.value, "response= ",responseData)
+    if (type.value === 'stocks') {
+     detailsData.value = {
+       metaData: responseData['Meta Data'],
+       timeSeries: responseData['Time Series (Daily)']
+      };
+    } else {
     detailsData.value = responseData;
+}
+
     
-    
-    console.log('API Response:', responseData);
-    console.log('Is Array:', Array.isArray(responseData));
-    if (Array.isArray(responseData)) {
-      console.log('First item:', responseData[0]);
-    }
-    
+    console.log('Fetched details data:', detailsData.value);
     detailsSpan.setStatus({ code: 1 });
     detailsSpan.end();
 
