@@ -34,8 +34,9 @@ function goToCrypto() {
 }
 
 async function fetchWatchlist() {
-  const userId = JSON.parse(localStorage.getItem("userData")).ID
-    logFrontendEvent({
+  const userId = JSON.parse(localStorage.getItem("userData")).ID;
+
+  logFrontendEvent({
     event: 'fetch_watchlist',
     type: 'Success',
     metadata: {
@@ -43,7 +44,8 @@ async function fetchWatchlist() {
       pageContext: 'Crypto_View'
     },
     span: null
-  })
+  });
+
   const mainSpan = tracer.startSpan('fetch_user_watchlist', {
     attributes: {
       'operation': 'fetch_watchlist',
@@ -51,12 +53,13 @@ async function fetchWatchlist() {
       'component': 'watchlist_service',
       'page.context': 'dashboard'
     }
-  })
+  });
 
-  const ctx = trace.setSpan(context.active(), mainSpan)
-  const headers = {}
-  propagation.inject(ctx, headers)
-logFrontendEvent({
+  const ctx = trace.setSpan(context.active(), mainSpan);
+  const headers = {};
+  propagation.inject(ctx, headers);
+
+  logFrontendEvent({
     event: 'fetch_watchlist_start',
     type: 'Success',
     metadata: {
@@ -64,119 +67,133 @@ logFrontendEvent({
       pageContext: 'Crypto_View'
     },
     span: mainSpan
-  })
-  try {
-    const apiUrl = import.meta.env.VITE_API_URL
-    const fullUrl = `${apiUrl}/watchlist/${userId}`
+  });
 
-    mainSpan.setAttribute('http.url', fullUrl)
+  await context.with(ctx, async () => {
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL;
+      const fullUrl = `${apiUrl}/watchlist/${userId}`;
 
-    const httpSpan = tracer.startSpan('http_request_watchlist', {
-      parent: mainSpan,
-      attributes: {
-        'http.method': 'GET',
-        'http.url': fullUrl,
-        'user.agent': navigator.userAgent
-      }
-    })
- logFrontendEvent({
-    event: 'fetch_watchlist_request_sent',
-    type: 'Success',
-    metadata: {
-      userId,
-      pageContext: 'Crypto_View'
-    },
-    span: httpSpan
-  })
-    const response = await fetch(fullUrl, {
-      method: 'GET',
-      headers
-    })
+      mainSpan.setAttribute('http.url', fullUrl);
 
-    httpSpan.setAttribute('http.status_code', response.status)
+      const httpSpan = tracer.startSpan('http_request_watchlist', {
+        attributes: {
+          'http.method': 'GET',
+          'http.url': fullUrl,
+          'user.agent': navigator.userAgent
+        }
+      });
 
-    if (!response.ok) {
-       logFrontendEvent({
-    event: 'fetch_watchlist_error',
-    type: 'Error',
-    metadata: {
-      userId,
-      pageContext: 'Crypto_View',
-      error: 'Response not ok',}})
-  
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      
+      const httpCtx = trace.setSpan(context.active(), httpSpan);
+
+      logFrontendEvent({
+        event: 'fetch_watchlist_request_sent',
+        type: 'Success',
+        metadata: {
+          userId,
+          pageContext: 'Crypto_View'
+        },
+        span: httpSpan
+      });
+
+      await context.with(httpCtx, async () => {
+        const response = await fetch(fullUrl, {
+          method: 'GET',
+          headers
+        });
+
+        httpSpan.setAttribute('http.status_code', response.status);
+
+        if (!response.ok) {
+          logFrontendEvent({
+            event: 'fetch_watchlist_error',
+            type: 'Error',
+            metadata: {
+              userId,
+              pageContext: 'Crypto_View',
+              error: 'Response not ok'
+            }
+          });
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+
+        await context.with(trace.setSpan(context.active(), httpSpan), async () => {
+
+        const processingSpan = tracer.startSpan('process_watchlist_data', {
+          attributes: {
+            'processing.type': 'json_decode'
+          }
+        });
+
+        // const processingCtx = trace.setSpan(context.active(), processingSpan);
+          const result = await response.json();
+          const items = Array.isArray(result) ? result : [];
+
+          logFrontendEvent({
+            event: 'processing watchlist',
+            type: 'Success',
+            metadata: {
+              userId,
+              pageContext: 'Crypto_View'
+            },
+            span: processingSpan
+          });
+
+          watchlist.value = items
+            .filter(item => item.Type === 'CRYPTO')
+            .map(item => ({ Symbol: item.Symbol, CryptoId: item.CryptoId }));
+
+          processingSpan.setAttributes({
+            'watchlist.items_total': items.length
+          });
+          processingSpan.setStatus({ code: 1 });
+          processingSpan.end();
+        });
+
+        httpSpan.setStatus({ code: 1 });
+        httpSpan.end();
+
+        mainSpan.setAttributes({
+          'watchlist.items_count': watchlist.value.length,
+          'operation.success': true
+        });
+
+        mainSpan.setStatus({ code: 1 });
+
+        logFrontendEvent({
+          event: 'watchlist fetched and processed',
+          type: 'Success',
+          metadata: {
+            userId,
+            pageContext: 'Crypto_View'
+          },
+          span: mainSpan
+        });
+      });
+    } catch (err) {
+      console.error("Error fetching watchlist:", err);
+      mainSpan.setAttributes({
+        'error.message': err.message,
+        'operation.success': false
+      });
+      logFrontendEvent({
+        event: 'fetch_watchlist_error',
+        type: 'Error',
+        metadata: {
+          userId,
+          pageContext: 'Crypto_View',
+          error: err
+        },
+        span: mainSpan
+      });
+      mainSpan.setStatus({ code: 2, message: err.message });
+    } finally {
+      mainSpan.end();
     }
-
-    const processingSpan = tracer.startSpan('process_watchlist_data', {
-      parent: httpSpan,
-      attributes: {
-        'processing.type': 'json_decode'
-      }
-    })
-
-    const result = await response.json()
-    // console.log(result)
-    const items = Array.isArray(result) ? result :  []
- logFrontendEvent({
-    event: 'processing watchlist',
-    type: 'Success',
-    metadata: {
-      userId,
-      pageContext: 'Crypto_View'
-    },
-    span: processingSpan
-  })
-
-watchlist.value = items
-  .filter(item => item.Type === 'CRYPTO')
-  .map(item => ({ Symbol: item.Symbol, CryptoId: item.CryptoId }))
-    console.log(watchlist.value)
-    processingSpan.setAttributes({
-      'watchlist.items_total': items.length
-    })
-    processingSpan.setStatus({ code: 1 })
-    processingSpan.end()
-
-    httpSpan.setStatus({ code: 1 })
-    httpSpan.end()
-
-    mainSpan.setAttributes({
-      'watchlist.items_count': watchlist.value.length,
-      'operation.success': true
-    })
-
-    mainSpan.setStatus({ code: 1 })
-logFrontendEvent({
-    event: 'watchlist fetched and processed',
-    type: 'Success',
-    metadata: {
-      userId,
-      pageContext: 'Crypto_View'
-    },
-    span: mainSpan
-  })
-  } catch (err) {
-    console.error("Error fetching watchlist:", err)
-    mainSpan.setAttributes({
-      'error.message': err.message,
-      'operation.success': false
-    })
-     logFrontendEvent({
-    event: 'fetch_watchlist_error',
-    type: 'Error',
-    metadata: {
-      userId,
-      pageContext: 'Crypto_View',
-      error :err
-    },
-    span: mainSpan
-  })
-    mainSpan.setStatus({ code: 2, message: err.message })
-  } finally {
-    mainSpan.end()
-  }
+  });
 }
+
 
 async function fetchSymbols() {
   const mainSpan = tracer.startSpan('fetchCryptoSymbols', {
@@ -400,7 +417,7 @@ async function removeFromWatchlist(symbol,id) {
     const userId = parsedUser.ID 
 
     const apiUrl = import.meta.env.VITE_API_URL
-    const endpoint = `${apiUrl}/watchlist/remove/crypto/${userId}/${id}`
+    const endpoint = `${apiUrl}/watchlist/remove/${userId}/crypto/${id}`
 
     const headers = {}
     const ctx = trace.setSpan(context.active(), span)

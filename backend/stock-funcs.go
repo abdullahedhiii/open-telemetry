@@ -17,6 +17,7 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
 	_ "go.opentelemetry.io/otel/trace"
+	"gorm.io/gorm"
 )
 
 // const apiKey = "26AMBY8WA3V0FCMD"
@@ -789,6 +790,7 @@ func removeFromWatchlist(w http.ResponseWriter, r *http.Request) {
 		attribute.String("Span ID", span.SpanContext().SpanID().String())))
 
 	userId := mux.Vars(r)["userId"]
+	d_type := mux.Vars(r)["type"]
 	symbol := mux.Vars(r)["symbol"]
 
 	if userId == "" || symbol == "" {
@@ -807,7 +809,12 @@ func removeFromWatchlist(w http.ResponseWriter, r *http.Request) {
 		attribute.String("user_id", userId),
 		attribute.String("symbol_to_remove", symbol),
 	)
-	result := DB.Where("user_id = ? AND symbol = ?", userId, symbol).Delete(&UserSymbols{})
+	var result *gorm.DB
+	if d_type == "CRYPTO" {
+		result = DB.Where("user_id = ? AND cryptoId = ? ", userId, symbol, "CRYPTO").Delete(&UserSymbols{})
+	} else {
+		result = DB.Where("user_id = ? AND symbol = ?", userId, symbol).Delete(&UserSymbols{})
+	}
 	dbCallDuration := time.Since(startTime).Seconds()
 	dbCallSpan.End()
 

@@ -209,9 +209,9 @@ async function handleLogin() {
      span
  });
 
-    setTimeout(() => {
-      alert('Login successful! Would redirect to dashboard.')
-    }, 1500)
+    // setTimeout(() => {
+    //   alert('Login successful! Would redirect to dashboard.')
+    // }, 1500)
     
     span.setStatus({ code: 1 })
     window.location = '/stocks'
