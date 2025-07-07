@@ -209,7 +209,6 @@ async function handleLogin() {
      span
  });
 
-    
     setTimeout(() => {
       alert('Login successful! Would redirect to dashboard.')
     }, 1500)
