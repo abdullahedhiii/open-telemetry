@@ -5,6 +5,7 @@ A comprehensive web application demonstrating modern observability practices wit
 ## Table of Contents
 
 - [Project Overview](#project-overview)
+- [OpenTelemetry Benefits & Limitations](#opentelemetry-benefits--limitations)
 - [OpenTelemetry Usage & Architecture](#opentelemetry-usage--architecture)
 - [Milestone 1: Docker](#milestone-1-docker)
 - [Milestone 2: Kubernetes](#milestone-2-kubernetes)
@@ -28,6 +29,211 @@ This project showcases a production-ready observability stack featuring:
   - Jaeger for distributed tracing
   - EFK Stack (Elasticsearch, Fluentd, Kibana) for log management
   - cAdvisor for container metrics
+
+---
+
+## OpenTelemetry Benefits & Limitations
+
+### 🚀 Benefits
+
+#### 1. Vendor-Agnostic Instrumentation
+OpenTelemetry provides a **standard interface** to instrument your code for metrics, traces, and logs. You can instrument once and export to any observability backend such as:
+
+- **Jaeger** (Distributed Tracing)
+- **Prometheus** (Metrics)
+- **Loki** (Logs)
+- **Zipkin** (Tracing)
+- **New Relic** (APM)
+- **Datadog** (Full-stack observability)
+- **Elasticsearch** (Logs & Analytics)
+
+**Time & Effort Savings:**
+- ✅ No need to rewrite instrumentation code when switching backends
+- ✅ Config changes (not code changes) are sufficient to change where data goes
+- ✅ Future-proof your observability investment
+
+**Example from our project:**
+```yaml
+# Switch from Jaeger to Zipkin - just config change
+exporters:
+  # jaeger:
+  #   endpoint: jaeger:14250
+  zipkin:
+    endpoint: http://zipkin:9411/api/v2/spans
+```
+
+#### 2. End-to-End Distributed Tracing
+OpenTelemetry enables **full visibility** into how a request flows through the system:
+
+```
+Frontend (Vue.js) → Backend (Go API) → Database (PostgreSQL) → External APIs
+```
+
+**How it works:**
+1. **Context Injection**: Client injects trace context into HTTP headers (`traceparent`, `tracestate`)
+2. **Context Extraction**: Server extracts context from headers and continues the trace
+3. **Span Linking**: All operations under a single trace ID for complete request flow
+
+**Business Value:**
+- 🔍 Track performance bottlenecks across services
+- 📊 Understand system behavior and dependencies  
+- 🐛 Improve debugging with correlated spans
+- 📈 Monitor SLA compliance end-to-end
+
+**Implementation in our project:**
+```javascript
+// Frontend: Context propagation
+const headers = {}
+propagation.inject(ctx, headers)
+await fetch('/api/stocks', { headers })
+```
+
+```go
+// Backend: Context extraction
+ctx := otel.GetTextMapPropagator().Extract(r.Context(), 
+    propagation.HeaderCarrier(r.Header))
+ctx, span := tracer.Start(ctx, "fetch_stocks")
+```
+
+#### 3. Correlation Between Telemetry Signals
+OpenTelemetry enables **correlation** between traces, metrics, and logs through shared context:
+
+- **Trace Context in Logs**: Every log entry includes `trace_id` and `span_id`
+- **Metrics with Trace Attribution**: Link performance metrics to specific traces
+- **Cross-Signal Analysis**: Debug issues by jumping between traces, logs, and metrics
+
+**Example correlation:**
+```json
+{
+  "level": "ERROR",
+  "msg": "Database query failed",
+  "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+  "span_id": "00f067aa0ba902b7",
+  "error": "connection timeout"
+}
+```
+
+### ⚠️ Current Limitations & Future Improvements
+
+#### 1. **Server-Side Logging Pipeline Disconnect**
+
+**Current Issue:**
+```mermaid
+graph LR
+    A[Go Backend] -->|Traces & Metrics| B[OTel Collector]
+    A -->|Logs| C[File System]
+    C -->|Read Files| D[Fluentd]
+    D -->|Forward| E[Elasticsearch]
+    
+    B -->|Export| F[Jaeger/Prometheus]
+    
+    style C fill:#ffebee
+    style D fill:#ffebee
+```
+
+The current implementation **does not support OpenTelemetry-based logging** on the server side. Instead, logs are collected through a **separate Fluentd pipeline** that reads log files from the Go backend and forwards them to Elasticsearch.
+
+**Problems:**
+- ❌ Disconnected logging pipeline not integrated with OTel traces/metrics
+- ❌ Additional infrastructure complexity (Fluentd, file volumes)
+- ❌ Potential log loss if file system issues occur
+- ❌ No unified configuration for all telemetry signals
+
+**Future Solution:**
+```mermaid
+graph LR
+    A[Go Backend] -->|Traces, Metrics & Logs| B[OTel Collector]
+    B -->|Export Traces| C[Jaeger]
+    B -->|Export Metrics| D[Prometheus] 
+    B -->|Export Logs| E[Elasticsearch/Loki]
+    
+    style B fill:#e8f5e9
+```
+
+**Implementation Plan:**
+```go
+// Future: OpenTelemetry Logs SDK
+import "go.opentelemetry.io/otel/log"
+
+loggerProvider := log.NewLoggerProvider(
+    log.WithResource(resource.Default()),
+    log.WithLogRecordProcessor(
+        log.NewBatchLogRecordProcessor(otlploghttp.New()),
+    ),
+)
+
+// Structured logs with embedded trace context
+logger := loggerProvider.Logger("stock-tracker-service")
+logger.EmitLogRecord(ctx, log.LogRecord{
+    Timestamp: time.Now(),
+    Body:      log.StringValue("Database query executed"),
+    Attributes: []log.KeyValue{
+        log.String("query.table", "users"),
+        log.Int64("query.duration_ms", 150),
+    },
+})
+```
+
+#### 2. **Limited Frontend Observability**
+
+**Current State:**
+- ✅ **Traces**: User interactions, API calls, navigation
+- ❌ **Metrics**: No frontend performance metrics
+- ❌ **Logs**: No client-side error logging through OTel
+
+**Missing Capabilities:**
+- Frontend performance metrics (page load times, bundle sizes)
+- Client-side error tracking and logging
+- User experience metrics (Core Web Vitals)
+- Real User Monitoring (RUM) data
+
+**Future Improvements:**
+```javascript
+// Frontend Metrics (Planned)
+import { metrics } from '@opentelemetry/api'
+
+const meter = metrics.getMeter('stock-tracker-frontend')
+const pageLoadTime = meter.createHistogram('page_load_duration_ms')
+const userInteractions = meter.createCounter('user_interactions_total')
+
+// Frontend Logging (Planned)  
+import { logs } from '@opentelemetry/api'
+
+const logger = logs.getLogger('stock-tracker-frontend')
+logger.emit({
+  severityText: 'ERROR',
+  body: 'API call failed',
+  attributes: {
+    'error.type': 'NetworkError',
+    'api.endpoint': '/stocks/AAPL'
+  }
+})
+```
+
+#### 3. **Benefits of Full OpenTelemetry Integration**
+
+Once limitations are addressed:
+
+**Unified Pipeline:**
+- 🎯 Single configuration for all telemetry data
+- 🔧 Simplified infrastructure (no Fluentd needed)
+- 📊 Better correlation between all signals
+- 🚀 Consistent sampling and filtering policies
+
+**Complete End-to-End Visibility:**
+- 👤 Frontend user experience metrics
+- 🌐 Network performance tracking  
+- 🔗 Full request trace from browser to database
+- 📱 Client-side error correlation with backend traces
+
+**Implementation Roadmap:**
+1. **Phase 1**: Implement OTel Logs SDK in backend
+2. **Phase 2**: Add frontend metrics collection
+3. **Phase 3**: Implement client-side logging
+4. **Phase 4**: Remove Fluentd dependency
+5. **Phase 5**: Unified observability dashboard
+
+---
 
 ## OpenTelemetry Usage & Architecture
 
@@ -155,7 +361,6 @@ if err := DB.Use(otelgorm.NewPlugin(
     return fmt.Errorf("error enabling OpenTelemetry for GORM: %w", err)
 }
 ```
-
 ---
 
 ## Milestone 1: Docker
@@ -327,8 +532,8 @@ dependencies:
 
 | Chart | Responsibility | Components |
 |-------|---------------|------------|
-| **applications** | Observability Stack | Prometheus, Grafana, Jaeger, cAdvisor, Node Exporter |
-| **infra** | Data & Core Services | PostgreSQL, Elasticsearch, App Services |
+| **applications** | Observability Stack | Prometheus, Grafana, Jaeger, cAdvisor, Node Exporter, Frontend,Backend |
+| **infra** | Data & Core Services | PostgreSQL, Elasticsearch, Fluentd, Otel-collector |
 
 ### Deployment Strategy
 
@@ -487,21 +692,6 @@ helm install apps-stack .
 kubectl get pods
 kubectl port-forward svc/grafana 3000:3000
 ```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
----
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ---
 
 **Note**: This project demonstrates production-grade OpenTelemetry implementation with proper separation of telemetry data types and scalable deployment patterns using Kubernetes and HELM.
