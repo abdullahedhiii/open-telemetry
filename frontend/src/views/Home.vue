@@ -2,6 +2,7 @@
 import { tracer } from '../tracing.js'
 import { ref, computed, onMounted } from 'vue'
 import { context, propagation, trace } from '@opentelemetry/api'
+import {logFrontendEvent} from "../logger.js"
 
 const isLoginMode = ref(true)
 const loading = ref(false)
@@ -198,7 +199,16 @@ async function handleLogin() {
       'user.authenticated': true,
       'response.has_token': !!data.token
     })
-    
+       logFrontendEvent({
+     event: 'User logged in',
+     type: 'auth',
+     metadata: {
+       email: loginForm.value.email,
+       hasToken: !!data.token
+     },
+     span
+ });
+
     
     setTimeout(() => {
       alert('Login successful! Would redirect to dashboard.')
@@ -215,6 +225,15 @@ async function handleLogin() {
       'error.message': err.message,
       'error.type': err.constructor.name
     })
+logFrontendEvent({
+     event: 'Login failed',
+     type: 'error',
+     metadata: {
+       email: loginForm.value.email,
+       message: err.message
+     },
+     span
+ });
 
     span.setStatus({ code: 2, message: err.message })
   } finally {
@@ -303,7 +322,15 @@ async function handleRegister() {
     
     window.location = '/stocks'
     span.setStatus({ code: 1 })
-    
+       logFrontendEvent({
+     event: 'User registered',
+     type: 'auth',
+     metadata: {
+       username: registerForm.value.username,
+       email: registerForm.value.email
+     },
+     span
+ });
   } catch (err) {
     error.value = err.message
     
@@ -312,7 +339,16 @@ async function handleRegister() {
       'error.message': err.message,
       'error.type': err.constructor.name
     })
-    
+       logFrontendEvent({
+     event: 'Registration failed',
+     type: 'error',
+     metadata: {
+       email: registerForm.value.email,
+       message: err.message
+     },
+     span
+ });
+
     span.setStatus({ code: 2, message: err.message })
   } finally {
     loading.value = false
@@ -341,7 +377,14 @@ function toggleMode() {
     span.setAttributes({
       'operation.success': true
     })
-    
+       logFrontendEvent({
+     event: 'Switched auth mode',
+     type: 'user_action',
+     metadata: {
+       newMode: isLoginMode.value ? 'login' : 'register'
+     },
+     span
+ });
     span.setStatus({ code: 1 })
   } catch (err) {
     span.setStatus({ code: 2, message: err.message })

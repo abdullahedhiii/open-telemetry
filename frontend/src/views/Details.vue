@@ -2,6 +2,7 @@
 import { tracer } from '../tracing.js'
 import { ref, onMounted, computed } from 'vue'
 import { context, propagation, trace } from '@opentelemetry/api'
+import {logFrontendEvent} from "../logger.js"
 
 const symbol = ref('')
 const type = ref('')
@@ -132,14 +133,33 @@ async function fetchData() {
 }
 
     
-    console.log('Fetched details data:', detailsData.value);
     detailsSpan.setStatus({ code: 1 });
     detailsSpan.end();
-
+     logFrontendEvent({
+    event: 'Fetched symbol details',
+     type: 'data',
+     metadata: {
+       symbol: symbol.value,
+       type: type.value,
+       dataSize: JSON.stringify(responseData).length
+     },
+     span: detailsSpan
+   });
     
     checkWatchlistStatus();
     
   } catch (err) {
+
+   logFrontendEvent({
+     event: 'Fetched symbol details',
+     type: 'data',
+     metadata: {
+       symbol: symbol.value,
+       type: type.value,
+       dataSize: JSON.stringify(responseData).length
+     },
+     span: detailsSpan
+   });
     error.value = err.message;
     span.setStatus({ code: 2, message: err.message });
   } finally {
@@ -199,9 +219,24 @@ function toggleWatchlist() {
       'watchlist.total_items': watchlist.length,
       'operation.success': true
     })
-    
+    logFrontendEvent({
+    event: isInWatchlist.value ? 'Added to watchlist' : 'Removed from watchlist',
+    type: 'user_action',
+    metadata: {
+      symbol: symbol.value,
+      type: type.value,
+      newStatus: isInWatchlist.value
+    },
+    span
+  });
     span.setStatus({ code: 1 })
   } catch (err) {
+       logFrontendEvent({
+     event: 'Error updating watchlist',
+     type: 'error',
+     metadata: { message: err.message, symbol: symbol.value },
+     span
+   });
     span.setStatus({ code: 2, message: err.message })
   } finally {
     span.end()
