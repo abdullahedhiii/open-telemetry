@@ -11,5 +11,8 @@ dependencies:
 - name: cadvisor
   repository: https://charts.bitnami.com/bitnami
   version: 0.1.10
-digest: sha256:6f53a0c442ccb606b3628a0debdbe4a075604012d17177c6627a2db5fba0678c
-generated: "2025-07-04T17:23:27.090857+05:00"
+- name: node-exporter
+  repository: https://charts.bitnami.com/bitnami
+  version: 4.5.16
+digest: sha256:32d23bf4325de933ea0d728a05bae2d1b9b74c5f1819ee5482ad2b5f074a2051
+generated: "2025-07-07T15:47:44.300684+05:00"

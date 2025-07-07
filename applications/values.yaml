@@ -36,11 +36,29 @@ prometheus:
         static_configs:
           - targets: 
               - cadvisor-service:8080
+      
+      - job_name: 'node-exporter'
+        static_configs:
+          - targets: 
+              - node-exporter-service:9100
 
       # - job_name: 'backend'
       #   static_configs:
       #     - targets: 
       #        - backend-service:2222
+
+node-exporter:
+  fullnameOverride: node-exporter-service
+  serviceAccount:
+    create: false
+  
+  containerPorts:
+    metrics: 9100
+  
+  service:
+    type: ClusterIP
+    ports:
+      metrics: 9100
 
 grafana:
   fullnameOverride: grafana-service
@@ -50,7 +68,7 @@ grafana:
 
   admin:
     user: admin
-    password: admin  # Will be required again on future upgrades unless using a custom secret
+    password: admin 
 
   grafana:
     service:
@@ -139,7 +157,7 @@ kibana:
       cpu: "500m"
   elasticsearch:
     hosts: https://elasticsearch-service:9200
-    token: AAEAAWVsYXN0aWMva2liYW5hL2tpYmFuYS10b2tlbjpaU2ZpclUza1FRLUFHMjc0MGpiMV9B
+    token: AAEAAWVsYXN0aWMva2liYW5hL2tpYmFuYS10b2tlbjpDTnpvaGNsSFNHR3NBQk9Ca3F6Z2xn
     cert: /usr/share/kibana/config/certs/http_ca.crt
     sslVerificationMode: none
   config:
@@ -188,7 +206,6 @@ jaeger:
 
  storage:
   type: memory
-
 
 
 ingress:
@@ -248,6 +265,12 @@ ingress:
           pathType: Prefix
           serviceName: cadvisor-service
           servicePort: 8080
+    - host: node-exporter.127.0.0.1.sslip.io
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: node-exporter-service
+          servicePort: 9100
 
 cadvisor:
  automountServiceAccountToken: false

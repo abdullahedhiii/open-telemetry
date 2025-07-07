@@ -7,7 +7,6 @@ sudo docker load -i /tmp/ingress-nginx-controller.tar
 sudo docker load -i /tmp/kube-webhook-certgen.tar
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.12.2/deploy/static/provider/cloud/deploy.yaml
 
-
 ./elasticsearch-reset-password -u elastic -i -b -f
 ./elasticsearch-users useradd abdullah -p edhi12 -r superuser
 curl --cacert http_ca.crt --capath /usr/share/elasticsearch/config/certs https://localhost:9200

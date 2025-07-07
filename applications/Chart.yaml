@@ -20,5 +20,9 @@ dependencies:
   - name: cadvisor
     version: 0.1.10
     repository: https://charts.bitnami.com/bitnami
+  - name: node-exporter
+    version: 4.5.16   
+    repository: https://charts.bitnami.com/bitnami
+
 
 appVersion: "1.16.0"
