@@ -1,6 +1,7 @@
-package main
+package controllers
 
 import (
+	"backend/variables"
 	_ "context"
 	"encoding/csv"
 	"encoding/json"
@@ -29,7 +30,7 @@ type stockData struct {
 	Name   string
 }
 
-func getAllStockSymbols(w http.ResponseWriter, r *http.Request) {
+func GetAllStockSymbols(w http.ResponseWriter, r *http.Request) {
 	ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
 	tracer := otel.Tracer("stock-tracker-app-tracer")
 	ctx, span := tracer.Start(ctx, "getAllStockSymbolsHandler")
@@ -37,7 +38,7 @@ func getAllStockSymbols(w http.ResponseWriter, r *http.Request) {
 
 	r = r.WithContext(ctx)
 
-	Logger.InfoContext(ctx,
+	variables.Logger.InfoContext(ctx,
 		"Handler execution started",
 		"method", r.Method,
 		"target", r.URL.Path,
@@ -49,7 +50,7 @@ func getAllStockSymbols(w http.ResponseWriter, r *http.Request) {
 	)
 	span.AddEvent("Handler execution started")
 
-	httpRequestCount.Add(ctx, 1, metric.WithAttributes(
+	variables.HttpRequestCount.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("endpoint", "/stocks/symbols"),
 		attribute.String("method", r.Method),
 		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
@@ -70,9 +71,9 @@ func getAllStockSymbols(w http.ResponseWriter, r *http.Request) {
 	response, err := http.Get(apiUrl)
 	apiCallDuration := time.Since(apiCallStartTime).Seconds()
 
-	Logger.InfoContext(ctx, "External API call made", "url", apiUrl, "duration_sec", apiCallDuration, "error", err)
+	variables.Logger.InfoContext(ctx, "External API call made", "url", apiUrl, "duration_sec", apiCallDuration, "error", err)
 
-	externalAPICallDuration.Record(ctx, apiCallDuration, metric.WithAttributes(
+	variables.ExternalAPICallDuration.Record(ctx, apiCallDuration, metric.WithAttributes(
 		attribute.String("api.name", "alphavantage_api"),
 		attribute.String("api.operation", "LISTING_STATUS"),
 		attribute.Bool("api.error", err != nil),
@@ -86,7 +87,7 @@ func getAllStockSymbols(w http.ResponseWriter, r *http.Request) {
 		span.SetStatus(codes.Error, fmt.Sprintf("External API call failed: %v", err))
 		span.RecordError(err)
 
-		Logger.ErrorContext(ctx, "HTTP GET to AlphaVantage failed", "error", err)
+		variables.Logger.ErrorContext(ctx, "HTTP GET to AlphaVantage failed", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -102,7 +103,7 @@ func getAllStockSymbols(w http.ResponseWriter, r *http.Request) {
 
 		apiCallSpan.SetStatus(codes.Error, errorMsg)
 		span.SetStatus(codes.Error, errorMsg)
-		Logger.ErrorContext(ctx, "AlphaVantage returned non-OK status", "status_code", response.StatusCode, "body", string(bodyBytes))
+		variables.Logger.ErrorContext(ctx, "AlphaVantage returned non-OK status", "status_code", response.StatusCode, "body", string(bodyBytes))
 		http.Error(w, errorMsg, response.StatusCode)
 		return
 	}
@@ -126,7 +127,7 @@ func getAllStockSymbols(w http.ResponseWriter, r *http.Request) {
 			readCsvSpan.RecordError(err)
 			span.SetStatus(codes.Error, fmt.Sprintf("CSV processing failed: %v", err))
 			span.RecordError(err)
-			Logger.ErrorContext(ctx, "CSV parsing error", "error", err)
+			variables.Logger.ErrorContext(ctx, "CSV parsing error", "error", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -137,30 +138,30 @@ func getAllStockSymbols(w http.ResponseWriter, r *http.Request) {
 	readCsvSpan.SetAttributes(attribute.Int("symbols.active_count", len(symbols)))
 	readCsvSpan.SetStatus(codes.Ok, "CSV parsing complete")
 
-	Logger.InfoContext(ctx, "CSV parsing complete", "active_symbols_count", len(symbols))
+	variables.Logger.InfoContext(ctx, "CSV parsing complete", "active_symbols_count", len(symbols))
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(symbols); err != nil {
 		span.SetStatus(codes.Error, fmt.Sprintf("Failed to encode JSON response: %v", err))
 		span.RecordError(err)
-		Logger.ErrorContext(ctx, "Failed to encode JSON response", "error", err)
+		variables.Logger.ErrorContext(ctx, "Failed to encode JSON response", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	span.SetStatus(codes.Ok, "Stock symbols retrieved successfully")
 	span.AddEvent("Response sent")
-	Logger.InfoContext(ctx, "Stock symbols retrieved and response sent", "count", len(symbols))
+	variables.Logger.InfoContext(ctx, "Stock symbols retrieved and response sent", "count", len(symbols))
 }
 
-func getStockData(w http.ResponseWriter, r *http.Request) {
+func GetStockData(w http.ResponseWriter, r *http.Request) {
 	tracer := otel.Tracer("stock-tracker-app-tracer")
 	ctx, span := tracer.Start(r.Context(), "getStockDataFromSymbol")
 	defer span.End()
 
 	r = r.WithContext(ctx)
 	// Log handler entry
-	Logger.InfoContext(ctx, "Handler execution started", "method", r.Method, "target", r.URL.Path)
+	variables.Logger.InfoContext(ctx, "Handler execution started", "method", r.Method, "target", r.URL.Path)
 
 	span.SetAttributes(
 		attribute.String("http.method", r.Method),
@@ -171,15 +172,15 @@ func getStockData(w http.ResponseWriter, r *http.Request) {
 	symbol := mux.Vars(r)["symbol"]
 	if symbol == "" {
 		span.SetStatus(codes.Error, "Missing stock symbol in request")
-		Logger.ErrorContext(ctx, "Missing stock symbol in request path", "path", r.URL.Path)
+		variables.Logger.ErrorContext(ctx, "Missing stock symbol in request path", "path", r.URL.Path)
 		http.Error(w, "Stock symbol is required", http.StatusBadRequest)
 		return
 	}
-	Logger.InfoContext(ctx, "Retrieving stock data for symbol", "symbol", symbol)
+	variables.Logger.InfoContext(ctx, "Retrieving stock data for symbol", "symbol", symbol)
 
 	apiUrl := fmt.Sprintf("https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=%s&outputsize=compact&apikey=%s", symbol, apiKey)
 
-	httpRequestCount.Add(ctx, 1, metric.WithAttributes(
+	variables.HttpRequestCount.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("endpoint", "/stocks/{symbol}"),
 		attribute.String("method", r.Method),
 		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
@@ -200,9 +201,9 @@ func getStockData(w http.ResponseWriter, r *http.Request) {
 	apiCallDuration := time.Since(apiCallStartTime).Seconds()
 
 	// Log external API call completion
-	Logger.InfoContext(ctx, "External API call completed", "url", apiUrl, "duration_sec", apiCallDuration, "error_present", err != nil)
+	variables.Logger.InfoContext(ctx, "External API call completed", "url", apiUrl, "duration_sec", apiCallDuration, "error_present", err != nil)
 
-	externalAPICallDuration.Record(ctx, apiCallDuration, metric.WithAttributes(
+	variables.ExternalAPICallDuration.Record(ctx, apiCallDuration, metric.WithAttributes(
 		attribute.String("api.name", "alphavantage_api"),
 		attribute.String("api.operation", "TIME_SERIES_DAILY"),
 		attribute.Bool("api.error", err != nil),
@@ -216,7 +217,7 @@ func getStockData(w http.ResponseWriter, r *http.Request) {
 		span.SetStatus(codes.Error, fmt.Sprintf("External API call failed: %v", err))
 		span.RecordError(err)
 		// Log error for HTTP GET
-		Logger.ErrorContext(ctx, "HTTP GET to AlphaVantage for stock data failed", "error", err, "api_url", apiUrl, "symbol", symbol)
+		variables.Logger.ErrorContext(ctx, "HTTP GET to AlphaVantage for stock data failed", "error", err, "api_url", apiUrl, "symbol", symbol)
 
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -234,7 +235,7 @@ func getStockData(w http.ResponseWriter, r *http.Request) {
 
 		apiCallSpan.SetStatus(codes.Error, errorMsg)
 		span.SetStatus(codes.Error, errorMsg)
-		Logger.ErrorContext(ctx, "AlphaVantage returned non-OK status for stock data",
+		variables.Logger.ErrorContext(ctx, "AlphaVantage returned non-OK status for stock data",
 			"status_code", response.StatusCode,
 			"response_body", string(bodyBytes),
 			"api_url", apiUrl,
@@ -243,12 +244,12 @@ func getStockData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	apiCallSpan.SetStatus(codes.Ok, "API call successful")
-	Logger.InfoContext(ctx, "AlphaVantage API call successful for stock data", "api_url", apiUrl, "status_code", response.StatusCode, "symbol", symbol)
+	variables.Logger.InfoContext(ctx, "AlphaVantage API call successful for stock data", "api_url", apiUrl, "status_code", response.StatusCode, "symbol", symbol)
 
 	_, responseSpan := tracer.Start(ctx, "processAPIresponse")
 	defer responseSpan.End()
 	responseSpan.AddEvent("Started decoding JSON")
-	Logger.InfoContext(ctx, "Starting JSON decoding for stock data response", "symbol", symbol)
+	variables.Logger.InfoContext(ctx, "Starting JSON decoding for stock data response", "symbol", symbol)
 
 	var stockData map[string]interface{}
 	if err := json.NewDecoder(response.Body).Decode(&stockData); err != nil {
@@ -257,11 +258,11 @@ func getStockData(w http.ResponseWriter, r *http.Request) {
 		span.SetStatus(codes.Error, fmt.Sprintf("JSON decoding failed: %v", err))
 		span.RecordError(err)
 		// Log error for JSON decoding
-		Logger.ErrorContext(ctx, "Failed to decode JSON response for stock data", "error", err, "symbol", symbol)
+		variables.Logger.ErrorContext(ctx, "Failed to decode JSON response for stock data", "error", err, "symbol", symbol)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	Logger.InfoContext(ctx, "JSON decoding complete for stock data response", "symbol", symbol)
+	variables.Logger.InfoContext(ctx, "JSON decoding complete for stock data response", "symbol", symbol)
 
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(stockData)
@@ -269,12 +270,12 @@ func getStockData(w http.ResponseWriter, r *http.Request) {
 		span.SetStatus(codes.Error, fmt.Sprintf("Failed to encode JSON response: %v", err))
 		span.RecordError(err)
 		// Log error for JSON encoding
-		Logger.ErrorContext(ctx, "Failed to encode JSON response for stock data", "error", err, "symbol", symbol)
+		variables.Logger.ErrorContext(ctx, "Failed to encode JSON response for stock data", "error", err, "symbol", symbol)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	} else {
 		span.SetStatus(codes.Ok, "Stock Data retrieved successfully")
 		span.AddEvent("Response sent")
-		Logger.InfoContext(ctx, "Stock data retrieved and response sent", "symbol", symbol)
+		variables.Logger.InfoContext(ctx, "Stock data retrieved and response sent", "symbol", symbol)
 	}
 }
 
@@ -284,7 +285,7 @@ type coinData struct {
 	Id     string
 }
 
-func getAllCryptoSymbols(w http.ResponseWriter, r *http.Request) {
+func GetAllCryptoSymbols(w http.ResponseWriter, r *http.Request) {
 	ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
 	tracer := otel.Tracer("stock-tracker-app-tracer")
 	ctx, span := tracer.Start(ctx, "getAllCryptoSymbolsHandler")
@@ -293,7 +294,7 @@ func getAllCryptoSymbols(w http.ResponseWriter, r *http.Request) {
 	r = r.WithContext(ctx)
 
 	// Log handler entry
-	Logger.InfoContext(ctx, "Handler execution started", "method", r.Method, "target", r.URL.Path)
+	variables.Logger.InfoContext(ctx, "Handler execution started", "method", r.Method, "target", r.URL.Path)
 
 	span.SetAttributes(
 		attribute.String("http.method", r.Method),
@@ -301,7 +302,7 @@ func getAllCryptoSymbols(w http.ResponseWriter, r *http.Request) {
 	)
 	span.AddEvent("Handler execution started")
 
-	httpRequestCount.Add(ctx, 1, metric.WithAttributes(
+	variables.HttpRequestCount.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("endpoint", "/crypto/symbols"),
 		attribute.String("method", r.Method),
 		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
@@ -323,9 +324,9 @@ func getAllCryptoSymbols(w http.ResponseWriter, r *http.Request) {
 	apiCallDuration := time.Since(apiCallStartTime).Seconds()
 
 	// Log external API call completion
-	Logger.InfoContext(ctx, "External API call completed", "url", apiUrl, "duration_sec", apiCallDuration, "error_present", err != nil)
+	variables.Logger.InfoContext(ctx, "External API call completed", "url", apiUrl, "duration_sec", apiCallDuration, "error_present", err != nil)
 
-	externalAPICallDuration.Record(ctx, apiCallDuration, metric.WithAttributes(
+	variables.ExternalAPICallDuration.Record(ctx, apiCallDuration, metric.WithAttributes(
 		attribute.String("api.name", "coingecko_api"),
 		attribute.String("api.operation", "LISTED_COINS"),
 		attribute.Bool("api.error", err != nil),
@@ -340,7 +341,7 @@ func getAllCryptoSymbols(w http.ResponseWriter, r *http.Request) {
 		span.RecordError(err)
 
 		// Log error for HTTP GET
-		Logger.ErrorContext(ctx, "HTTP GET to Coingecko for crypto symbols failed", "error", err, "api_url", apiUrl)
+		variables.Logger.ErrorContext(ctx, "HTTP GET to Coingecko for crypto symbols failed", "error", err, "api_url", apiUrl)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -358,7 +359,7 @@ func getAllCryptoSymbols(w http.ResponseWriter, r *http.Request) {
 		apiCallSpan.SetStatus(codes.Error, errorMsg)
 		span.SetStatus(codes.Error, errorMsg)
 		// Log error for non-OK status
-		Logger.ErrorContext(ctx, "Coingecko returned non-OK status for crypto symbols",
+		variables.Logger.ErrorContext(ctx, "Coingecko returned non-OK status for crypto symbols",
 			"status_code", response.StatusCode,
 			"response_body", string(bodyBytes),
 			"api_url", apiUrl)
@@ -366,13 +367,13 @@ func getAllCryptoSymbols(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	apiCallSpan.SetStatus(codes.Ok, "API call successful")
-	Logger.InfoContext(ctx, "Coingecko API call successful for crypto symbols", "api_url", apiUrl, "status_code", response.StatusCode)
+	variables.Logger.InfoContext(ctx, "Coingecko API call successful for crypto symbols", "api_url", apiUrl, "status_code", response.StatusCode)
 
 	var cryptoData []map[string]interface{}
 	_, readJSONparser := tracer.Start(ctx, "processJSONresponse")
 	defer readJSONparser.End()
 	readJSONparser.AddEvent("Starting JSON response parsing")
-	Logger.InfoContext(ctx, "Starting JSON decoding for crypto symbols response")
+	variables.Logger.InfoContext(ctx, "Starting JSON decoding for crypto symbols response")
 
 	if err := json.NewDecoder(response.Body).Decode(&cryptoData); err != nil {
 		readJSONparser.SetStatus(codes.Error, fmt.Sprintf("JSON read error: %v", err))
@@ -380,11 +381,11 @@ func getAllCryptoSymbols(w http.ResponseWriter, r *http.Request) {
 		span.SetStatus(codes.Error, fmt.Sprintf("crypto coins processing failed: %v", err))
 		span.RecordError(err)
 		// Log error for JSON decoding
-		Logger.ErrorContext(ctx, "Failed to decode JSON response for crypto symbols", "error", err, "api_url", apiUrl)
+		variables.Logger.ErrorContext(ctx, "Failed to decode JSON response for crypto symbols", "error", err, "api_url", apiUrl)
 		http.Error(w, "Failed to decode JSON", http.StatusInternalServerError)
 		return
 	}
-	Logger.InfoContext(ctx, "JSON decoding complete for crypto symbols response")
+	variables.Logger.InfoContext(ctx, "JSON decoding complete for crypto symbols response")
 
 	var symbols []coinData
 	for _, coin := range cryptoData {
@@ -393,16 +394,16 @@ func getAllCryptoSymbols(w http.ResponseWriter, r *http.Request) {
 				if name, ok := coin["name"].(string); ok {
 					symbols = append(symbols, coinData{Symbol: symbol, Name: name, Id: id})
 				} else {
-					Logger.WarnContext(ctx, "Coin data missing 'name' field, skipping coin", "coin_symbol", symbol)
+					variables.Logger.WarnContext(ctx, "Coin data missing 'name' field, skipping coin", "coin_symbol", symbol)
 				}
 			} else {
-				Logger.WarnContext(ctx, "Coin data missing 'id' field, skipping coin", "coin_symbol", symbol)
+				variables.Logger.WarnContext(ctx, "Coin data missing 'id' field, skipping coin", "coin_symbol", symbol)
 			}
 		} else {
-			Logger.WarnContext(ctx, "Coin data missing 'symbol' field, skipping record")
+			variables.Logger.WarnContext(ctx, "Coin data missing 'symbol' field, skipping record")
 		}
 	}
-	Logger.InfoContext(ctx, "Processed crypto data", "total_coins", len(cryptoData), "valid_symbols_extracted", len(symbols))
+	variables.Logger.InfoContext(ctx, "Processed crypto data", "total_coins", len(cryptoData), "valid_symbols_extracted", len(symbols))
 
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(symbols)
@@ -410,18 +411,18 @@ func getAllCryptoSymbols(w http.ResponseWriter, r *http.Request) {
 		span.SetStatus(codes.Error, fmt.Sprintf("Failed to encode JSON response: %v", err))
 		span.RecordError(err)
 		// Log error for JSON encoding
-		Logger.ErrorContext(ctx, "Failed to encode JSON response for crypto symbols", "error", err, "symbols_count", len(symbols))
+		variables.Logger.ErrorContext(ctx, "Failed to encode JSON response for crypto symbols", "error", err, "symbols_count", len(symbols))
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	} else {
 		span.SetStatus(codes.Ok, "Crypto symbols retrieved successfully")
 		span.AddEvent("Response sent")
-		Logger.InfoContext(ctx, "Crypto symbols retrieved and response sent", "count", len(symbols))
+		variables.Logger.InfoContext(ctx, "Crypto symbols retrieved and response sent", "count", len(symbols))
 	}
 
 }
 
-func getCryptoData(w http.ResponseWriter, r *http.Request) {
+func GetCryptoData(w http.ResponseWriter, r *http.Request) {
 	tracer := otel.Tracer("stock-tracker-app-tracer")
 	ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
 	ctx, span := tracer.Start(ctx, "getCoinDataFromSymbol")
@@ -430,7 +431,7 @@ func getCryptoData(w http.ResponseWriter, r *http.Request) {
 	r = r.WithContext(ctx)
 
 	// Log handler entry
-	Logger.InfoContext(ctx, "Handler execution started", "method", r.Method, "target", r.URL.Path)
+	variables.Logger.InfoContext(ctx, "Handler execution started", "method", r.Method, "target", r.URL.Path)
 
 	span.SetAttributes(
 		attribute.String("http.method", r.Method),
@@ -438,7 +439,7 @@ func getCryptoData(w http.ResponseWriter, r *http.Request) {
 	)
 	span.AddEvent("Handler execution started")
 
-	httpRequestCount.Add(ctx, 1, metric.WithAttributes(
+	variables.HttpRequestCount.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("endpoint", "/crypto/{symbol}"),
 		attribute.String("method", r.Method),
 		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
@@ -447,11 +448,11 @@ func getCryptoData(w http.ResponseWriter, r *http.Request) {
 	symbol := mux.Vars(r)["symbol"]
 	if symbol == "" {
 		span.SetStatus(codes.Error, "Missing crypto symbol in request")
-		Logger.ErrorContext(ctx, "Missing crypto symbol in request path", "path", r.URL.Path)
+		variables.Logger.ErrorContext(ctx, "Missing crypto symbol in request path", "path", r.URL.Path)
 		http.Error(w, "Crypto symbol is required", http.StatusBadRequest)
 		return
 	}
-	Logger.InfoContext(ctx, "Retrieving crypto data for symbol", "symbol", symbol)
+	variables.Logger.InfoContext(ctx, "Retrieving crypto data for symbol", "symbol", symbol)
 
 	apiUrl := fmt.Sprintf("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h&ids=%s", symbol)
 
@@ -470,9 +471,9 @@ func getCryptoData(w http.ResponseWriter, r *http.Request) {
 	apiCallDuration := time.Since(apiCallStartTime).Seconds()
 
 	// Log external API call completion
-	Logger.InfoContext(ctx, "External API call completed", "url", apiUrl, "duration_sec", apiCallDuration, "error_present", err != nil)
+	variables.Logger.InfoContext(ctx, "External API call completed", "url", apiUrl, "duration_sec", apiCallDuration, "error_present", err != nil)
 
-	externalAPICallDuration.Record(ctx, apiCallDuration, metric.WithAttributes(
+	variables.ExternalAPICallDuration.Record(ctx, apiCallDuration, metric.WithAttributes(
 		attribute.String("api.name", "coingecko_api"),
 		attribute.String("api.operation", "LISTED_COINS"), // This might be COIN_DATA, depending on what metric name makes sense
 		attribute.Bool("api.error", err != nil),
@@ -487,7 +488,7 @@ func getCryptoData(w http.ResponseWriter, r *http.Request) {
 		span.RecordError(err)
 
 		// Log error for HTTP GET
-		Logger.ErrorContext(ctx, "HTTP GET to Coingecko for crypto data failed", "error", err, "api_url", apiUrl, "symbol", symbol)
+		variables.Logger.ErrorContext(ctx, "HTTP GET to Coingecko for crypto data failed", "error", err, "api_url", apiUrl, "symbol", symbol)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -505,7 +506,7 @@ func getCryptoData(w http.ResponseWriter, r *http.Request) {
 		apiCallSpan.SetStatus(codes.Error, errorMsg)
 		span.SetStatus(codes.Error, errorMsg)
 		// Log error for non-OK status
-		Logger.ErrorContext(ctx, "Coingecko returned non-OK status for crypto data",
+		variables.Logger.ErrorContext(ctx, "Coingecko returned non-OK status for crypto data",
 			"status_code", response.StatusCode,
 			"response_body", string(bodyBytes),
 			"api_url", apiUrl,
@@ -514,12 +515,12 @@ func getCryptoData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	apiCallSpan.SetStatus(codes.Ok, "API call successful")
-	Logger.InfoContext(ctx, "Coingecko API call successful for crypto data", "api_url", apiUrl, "status_code", response.StatusCode, "symbol", symbol)
+	variables.Logger.InfoContext(ctx, "Coingecko API call successful for crypto data", "api_url", apiUrl, "status_code", response.StatusCode, "symbol", symbol)
 
 	_, responseSpan := tracer.Start(ctx, "processAPIresponse")
 	defer responseSpan.End()
 	responseSpan.AddEvent("Started decoding JSON")
-	Logger.InfoContext(ctx, "Starting JSON decoding for crypto data response", "symbol", symbol)
+	variables.Logger.InfoContext(ctx, "Starting JSON decoding for crypto data response", "symbol", symbol)
 
 	var cryptoData []map[string]interface{}
 	if err := json.NewDecoder(response.Body).Decode(&cryptoData); err != nil {
@@ -528,11 +529,11 @@ func getCryptoData(w http.ResponseWriter, r *http.Request) {
 		span.SetStatus(codes.Error, fmt.Sprintf("JSON decoding failed: %v", err))
 		span.RecordError(err)
 		// Log error for JSON decoding
-		Logger.ErrorContext(ctx, "Failed to decode JSON response for crypto data", "error", err, "symbol", symbol)
+		variables.Logger.ErrorContext(ctx, "Failed to decode JSON response for crypto data", "error", err, "symbol", symbol)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	Logger.InfoContext(ctx, "JSON decoding complete for crypto data response", "symbol", symbol, "data_items_count", len(cryptoData))
+	variables.Logger.InfoContext(ctx, "JSON decoding complete for crypto data response", "symbol", symbol, "data_items_count", len(cryptoData))
 
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(cryptoData)
@@ -540,24 +541,24 @@ func getCryptoData(w http.ResponseWriter, r *http.Request) {
 		span.SetStatus(codes.Error, fmt.Sprintf("Failed to encode JSON response: %v", err))
 		span.RecordError(err)
 		// Log error for JSON encoding
-		Logger.ErrorContext(ctx, "Failed to encode JSON response for crypto data", "error", err, "symbol", symbol)
+		variables.Logger.ErrorContext(ctx, "Failed to encode JSON response for crypto data", "error", err, "symbol", symbol)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	} else {
 		span.SetStatus(codes.Ok, "Crypto data retrieved successfully")
 		span.AddEvent("Response sent")
-		Logger.InfoContext(ctx, "Crypto data retrieved and response sent", "symbol", symbol)
+		variables.Logger.InfoContext(ctx, "Crypto data retrieved and response sent", "symbol", symbol)
 	}
 }
 
-func addToWatchlist(w http.ResponseWriter, r *http.Request) {
+func AddToWatchlist(w http.ResponseWriter, r *http.Request) {
 	tracer := otel.Tracer("stock-tracker-app-tracer")
 	ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
 	ctx, span := tracer.Start(ctx, "addToWatchList")
 	defer span.End()
 	r = r.WithContext(ctx)
 
-	Logger.InfoContext(ctx, "Handler execution started", "method", r.Method, "target", r.URL.Path)
+	variables.Logger.InfoContext(ctx, "Handler execution started", "method", r.Method, "target", r.URL.Path)
 
 	span.SetAttributes(
 		attribute.String("http.method", r.Method),
@@ -565,7 +566,7 @@ func addToWatchlist(w http.ResponseWriter, r *http.Request) {
 	)
 	span.AddEvent("Handler execution started")
 
-	httpRequestCount.Add(ctx, 1, metric.WithAttributes(
+	variables.HttpRequestCount.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("endpoint", "/watchlist/add"),
 		attribute.String("method", r.Method),
 		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
@@ -581,12 +582,12 @@ func addToWatchlist(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
 		span.SetStatus(codes.Error, fmt.Sprintf("Failed to decode request body: %v", err))
 		span.RecordError(err)
-		Logger.ErrorContext(ctx, "Failed to decode request body for add to watchlist", "error", err)
+		variables.Logger.ErrorContext(ctx, "Failed to decode request body for add to watchlist", "error", err)
 		http.Error(w, "Failed to decode request body", http.StatusBadRequest)
 		return
 	}
 
-	Logger.InfoContext(ctx, "Request body decoded", "symbol", data.Symbol, "type", data.Type, "userId", data.UserId)
+	variables.Logger.InfoContext(ctx, "Request body decoded", "symbol", data.Symbol, "type", data.Type, "userId", data.UserId)
 
 	_, dbCallSpan := tracer.Start(ctx, "db_call_addToList")
 	dbCallSpan.SetAttributes(
@@ -602,28 +603,28 @@ func addToWatchlist(w http.ResponseWriter, r *http.Request) {
 
 	switch data.Type {
 	case "STOCK":
-		entry := UserSymbols{
+		entry := variables.UserSymbols{
 			Symbol:   data.Symbol,
 			UserID:   data.UserId,
 			Type:     "STOCK",
 			CryptoId: "",
 		}
-		Logger.InfoContext(ctx, "Inserting stock watchlist item", "symbol", data.Symbol, "userId", data.UserId)
-		err = DB.Create(&entry).Error
+		variables.Logger.InfoContext(ctx, "Inserting stock watchlist item", "symbol", data.Symbol, "userId", data.UserId)
+		err = variables.DB.Create(&entry).Error
 
 	case "CRYPTO":
-		entry := UserSymbols{
+		entry := variables.UserSymbols{
 			Symbol:   data.Symbol,
 			UserID:   data.UserId,
 			Type:     "CRYPTO",
 			CryptoId: data.CryptoId,
 		}
-		Logger.InfoContext(ctx, "Inserting crypto watchlist item", "symbol", data.Symbol, "cryptoId", data.CryptoId, "userId", data.UserId)
-		err = DB.Create(&entry).Error
+		variables.Logger.InfoContext(ctx, "Inserting crypto watchlist item", "symbol", data.Symbol, "cryptoId", data.CryptoId, "userId", data.UserId)
+		err = variables.DB.Create(&entry).Error
 
 	default:
 		span.SetStatus(codes.Error, fmt.Sprintf("Invalid type: %s", data.Type))
-		Logger.ErrorContext(ctx, "Invalid watchlist item type", "type", data.Type)
+		variables.Logger.ErrorContext(ctx, "Invalid watchlist item type", "type", data.Type)
 		http.Error(w, "Invalid type (must be STOCK or CRYPTO)", http.StatusBadRequest)
 		return
 	}
@@ -634,19 +635,19 @@ func addToWatchlist(w http.ResponseWriter, r *http.Request) {
 		status = "failure"
 		dbCallSpan.SetStatus(codes.Error, fmt.Sprintf("DB insert failed: %v", err))
 		dbCallSpan.RecordError(err)
-		Logger.ErrorContext(ctx, "DB insert failed", "error", err, "symbol", data.Symbol, "userId", data.UserId)
+		variables.Logger.ErrorContext(ctx, "DB insert failed", "error", err, "symbol", data.Symbol, "userId", data.UserId)
 	} else {
 		dbCallSpan.SetStatus(codes.Ok, "DB insert successful")
-		Logger.InfoContext(ctx, "Watchlist item inserted", "symbol", data.Symbol, "userId", data.UserId)
+		variables.Logger.InfoContext(ctx, "Watchlist item inserted", "symbol", data.Symbol, "userId", data.UserId)
 	}
 
-	dbQueryCount.Add(ctx, 1, metric.WithAttributes(
+	variables.DbQueryCount.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("endpoint", "/watchlist/add"),
 		attribute.String("status", status),
 		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
 		attribute.String("Span ID", dbCallSpan.SpanContext().SpanID().String())))
 
-	dbQueryDuration.Record(ctx, dbCallDuration, metric.WithAttributes(
+	variables.DbQueryDuration.Record(ctx, dbCallDuration, metric.WithAttributes(
 		attribute.String("db.table", "UserSymbols"),
 		attribute.String("db.operation", "INSERT"),
 		attribute.Bool("db.error", err != nil),
@@ -664,17 +665,17 @@ func addToWatchlist(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(data); err != nil {
 		span.SetStatus(codes.Error, fmt.Sprintf("Response encoding failed: %v", err))
 		span.RecordError(err)
-		Logger.ErrorContext(ctx, "Response encoding failed", "error", err)
+		variables.Logger.ErrorContext(ctx, "Response encoding failed", "error", err)
 		http.Error(w, "Failed to write response", http.StatusInternalServerError)
 		return
 	}
 
 	span.SetStatus(codes.Ok, "Watchlist item added successfully")
 	span.AddEvent("Response sent")
-	Logger.InfoContext(ctx, "Watchlist item added and response sent", "symbol", data.Symbol, "userId", data.UserId)
+	variables.Logger.InfoContext(ctx, "Watchlist item added and response sent", "symbol", data.Symbol, "userId", data.UserId)
 }
 
-func getWatchlist(w http.ResponseWriter, r *http.Request) {
+func GetWatchlist(w http.ResponseWriter, r *http.Request) {
 	tracer := otel.Tracer("stock-tracker-app-tracer")
 	ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
 	ctx, span := tracer.Start(ctx, "getWatchlistHandler")
@@ -682,7 +683,7 @@ func getWatchlist(w http.ResponseWriter, r *http.Request) {
 
 	r = r.WithContext(ctx)
 
-	Logger.InfoContext(ctx, "Handler execution started", "method", r.Method, "target", r.URL.Path)
+	variables.Logger.InfoContext(ctx, "Handler execution started", "method", r.Method, "target", r.URL.Path)
 
 	span.SetAttributes(
 		attribute.String("http.method", r.Method),
@@ -690,7 +691,7 @@ func getWatchlist(w http.ResponseWriter, r *http.Request) {
 	)
 	span.AddEvent("Handler execution started")
 
-	httpRequestCount.Add(ctx, 1, metric.WithAttributes(
+	variables.HttpRequestCount.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("endpoint", "/watchlist/{userId}"),
 		attribute.String("method", r.Method),
 		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
@@ -699,13 +700,13 @@ func getWatchlist(w http.ResponseWriter, r *http.Request) {
 	userId := mux.Vars(r)["userId"]
 	if userId == "" {
 		span.SetStatus(codes.Error, "Missing userId in request for watchlist retrieval")
-		Logger.ErrorContext(ctx, "Missing userId in request path for watchlist", "path", r.URL.Path)
+		variables.Logger.ErrorContext(ctx, "Missing userId in request path for watchlist", "path", r.URL.Path)
 		http.Error(w, "User ID is required", http.StatusBadRequest)
 		return
 	}
-	Logger.InfoContext(ctx, "Retrieving watchlist for user", "userId", userId)
+	variables.Logger.InfoContext(ctx, "Retrieving watchlist for user", "userId", userId)
 
-	var watchlist []UserSymbols
+	var watchlist []variables.UserSymbols
 
 	startTime := time.Now()
 	_, dbCallSpan := tracer.Start(ctx, "db_call_getWatchlist")
@@ -715,7 +716,7 @@ func getWatchlist(w http.ResponseWriter, r *http.Request) {
 		attribute.String("user_id", userId),
 	)
 	// Assuming DB is defined and connected
-	err := DB.Where("user_id = ?", userId).Find(&watchlist).Error
+	err := variables.DB.Where("user_id = ?", userId).Find(&watchlist).Error
 	dbCallDuration := time.Since(startTime).Seconds()
 	dbCallSpan.End()
 
@@ -724,20 +725,20 @@ func getWatchlist(w http.ResponseWriter, r *http.Request) {
 		status = "failure"
 		dbCallSpan.SetStatus(codes.Error, fmt.Sprintf("Database select failed: %v", err))
 		dbCallSpan.RecordError(err)
-		Logger.ErrorContext(ctx, "Failed to retrieve watchlist from database", "error", err, "userId", userId)
+		variables.Logger.ErrorContext(ctx, "Failed to retrieve watchlist from database", "error", err, "userId", userId)
 	} else {
 		status = "success"
 		dbCallSpan.SetStatus(codes.Ok, "Database select successful")
-		Logger.InfoContext(ctx, "Successfully retrieved watchlist from database", "userId", userId, "items_count", len(watchlist))
+		variables.Logger.InfoContext(ctx, "Successfully retrieved watchlist from database", "userId", userId, "items_count", len(watchlist))
 	}
 
-	dbQueryCount.Add(ctx, 1, metric.WithAttributes(
+	variables.DbQueryCount.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("endpoint", "/watchlist/{userId}"),
 		attribute.String("status", status),
 		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
 		attribute.String("Span ID", dbCallSpan.SpanContext().SpanID().String())))
 
-	dbQueryDuration.Record(ctx, dbCallDuration, metric.WithAttributes(
+	variables.DbQueryDuration.Record(ctx, dbCallDuration, metric.WithAttributes(
 		attribute.String("db.table", "UserSymbols"),
 		attribute.String("db.operation", "SELECT"),
 		attribute.Bool("db.error", err != nil),
@@ -756,17 +757,17 @@ func getWatchlist(w http.ResponseWriter, r *http.Request) {
 		span.SetStatus(codes.Error, fmt.Sprintf("Failed to encode JSON response: %v", err))
 		span.RecordError(err)
 		// Log error for JSON encoding
-		Logger.ErrorContext(ctx, "Failed to encode JSON response for watchlist", "error", err, "userId", userId, "watchlist_items_count", len(watchlist))
+		variables.Logger.ErrorContext(ctx, "Failed to encode JSON response for watchlist", "error", err, "userId", userId, "watchlist_items_count", len(watchlist))
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	span.SetStatus(codes.Ok, "Watchlist retrieved successfully")
 	span.AddEvent("Response sent")
-	Logger.InfoContext(ctx, "Watchlist retrieved and response sent", "userId", userId, "count", len(watchlist))
+	variables.Logger.InfoContext(ctx, "Watchlist retrieved and response sent", "userId", userId, "count", len(watchlist))
 }
 
-func removeFromWatchlist(w http.ResponseWriter, r *http.Request) {
+func RemoveFromWatchlist(w http.ResponseWriter, r *http.Request) {
 	tracer := otel.Tracer("stock-tracker-app-tracer")
 	ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
 
@@ -775,7 +776,7 @@ func removeFromWatchlist(w http.ResponseWriter, r *http.Request) {
 
 	r = r.WithContext(ctx)
 
-	Logger.InfoContext(ctx, "Handler execution started", "method", r.Method, "target", r.URL.Path)
+	variables.Logger.InfoContext(ctx, "Handler execution started", "method", r.Method, "target", r.URL.Path)
 
 	span.SetAttributes(
 		attribute.String("http.method", r.Method),
@@ -783,7 +784,7 @@ func removeFromWatchlist(w http.ResponseWriter, r *http.Request) {
 	)
 	span.AddEvent("Handler execution started")
 
-	httpRequestCount.Add(ctx, 1, metric.WithAttributes(
+	variables.HttpRequestCount.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("endpoint", "/watchlist/remove"),
 		attribute.String("method", r.Method),
 		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
@@ -795,11 +796,11 @@ func removeFromWatchlist(w http.ResponseWriter, r *http.Request) {
 
 	if userId == "" || symbol == "" {
 		span.SetStatus(codes.Error, "Missing userId or symbol in request for watchlist removal")
-		Logger.ErrorContext(ctx, "Missing parameters for watchlist removal", "userId", userId, "symbol", symbol, "path", r.URL.Path)
+		variables.Logger.ErrorContext(ctx, "Missing parameters for watchlist removal", "userId", userId, "symbol", symbol, "path", r.URL.Path)
 		http.Error(w, "User ID and Symbol are required", http.StatusBadRequest)
 		return
 	}
-	Logger.InfoContext(ctx, "Attempting to remove item from watchlist", "userId", userId, "symbol", symbol)
+	variables.Logger.InfoContext(ctx, "Attempting to remove item from watchlist", "userId", userId, "symbol", symbol)
 
 	startTime := time.Now()
 	_, dbCallSpan := tracer.Start(ctx, "db_call_removeFromWatchlist")
@@ -811,9 +812,9 @@ func removeFromWatchlist(w http.ResponseWriter, r *http.Request) {
 	)
 	var result *gorm.DB
 	if d_type == "CRYPTO" {
-		result = DB.Where("user_id = ? AND crypto_id = ? ", userId, symbol).Delete(&UserSymbols{})
+		result = variables.DB.Where("user_id = ? AND crypto_id = ? ", userId, symbol).Delete(&variables.UserSymbols{})
 	} else {
-		result = DB.Where("user_id = ? AND symbol = ?", userId, symbol).Delete(&UserSymbols{})
+		result = variables.DB.Where("user_id = ? AND symbol = ?", userId, symbol).Delete(&variables.UserSymbols{})
 	}
 	dbCallDuration := time.Since(startTime).Seconds()
 	dbCallSpan.End()
@@ -823,20 +824,20 @@ func removeFromWatchlist(w http.ResponseWriter, r *http.Request) {
 		status = "failure"
 		dbCallSpan.SetStatus(codes.Error, fmt.Sprintf("Database delete failed: %v", result.Error))
 		dbCallSpan.RecordError(result.Error)
-		Logger.ErrorContext(ctx, "Failed to remove item from watchlist in database", "error", result.Error, "userId", userId, "symbol", symbol)
+		variables.Logger.ErrorContext(ctx, "Failed to remove item from watchlist in database", "error", result.Error, "userId", userId, "symbol", symbol)
 	} else {
 		status = "success"
 		dbCallSpan.SetStatus(codes.Ok, "Database delete successful")
-		Logger.InfoContext(ctx, "Successfully removed item from watchlist in database", "userId", userId, "symbol", symbol, "rows_affected", result.RowsAffected)
+		variables.Logger.InfoContext(ctx, "Successfully removed item from watchlist in database", "userId", userId, "symbol", symbol, "rows_affected", result.RowsAffected)
 	}
 
-	dbQueryCount.Add(ctx, 1, metric.WithAttributes(
+	variables.DbQueryCount.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("endpoint", "/watchlist/remove"),
 		attribute.String("status", status),
 		attribute.String("Trace ID", span.SpanContext().TraceID().String()),
 		attribute.String("Span ID", dbCallSpan.SpanContext().SpanID().String())))
 
-	dbQueryDuration.Record(ctx, dbCallDuration, metric.WithAttributes(
+	variables.DbQueryDuration.Record(ctx, dbCallDuration, metric.WithAttributes(
 		attribute.String("db.table", "UserSymbols"),
 		attribute.String("db.operation", "DELETE"),
 		attribute.Bool("db.error", result.Error != nil),
@@ -852,7 +853,7 @@ func removeFromWatchlist(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if result.RowsAffected == 0 {
-		Logger.WarnContext(ctx, "Attempted to remove non-existent item from watchlist", "userId", userId, "symbol", symbol)
+		variables.Logger.WarnContext(ctx, "Attempted to remove non-existent item from watchlist", "userId", userId, "symbol", symbol)
 		// Consider returning 404 Not Found if no rows were affected by a delete
 		http.Error(w, "Symbol not found in watchlist or already removed", http.StatusNotFound)
 		return
@@ -862,12 +863,12 @@ func removeFromWatchlist(w http.ResponseWriter, r *http.Request) {
 		span.SetStatus(codes.Error, fmt.Sprintf("Failed to encode JSON response: %v", err))
 		span.RecordError(err)
 		// Log error for JSON encoding
-		Logger.ErrorContext(ctx, "Failed to encode JSON response for watchlist removal", "error", err, "userId", userId, "symbol", symbol)
+		variables.Logger.ErrorContext(ctx, "Failed to encode JSON response for watchlist removal", "error", err, "userId", userId, "symbol", symbol)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	span.SetStatus(codes.Ok, "Symbol removed from watchlist successfully")
 	span.AddEvent("Response sent")
-	Logger.InfoContext(ctx, "Symbol removed from watchlist and response sent", "userId", userId, "symbol", symbol)
+	variables.Logger.InfoContext(ctx, "Symbol removed from watchlist and response sent", "userId", userId, "symbol", symbol)
 }

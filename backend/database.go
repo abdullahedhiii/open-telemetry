@@ -1,6 +1,7 @@
 package main
 
 import (
+	"backend/variables"
 	"context"
 	"fmt"
 	"log"
@@ -18,7 +19,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-var DB *gorm.DB
+// var DB *gorm.DB
 
 type User struct {
 	gorm.Model
@@ -66,12 +67,12 @@ func initDB() error {
 	}
 
 	var err error
-	DB, err = gorm.Open(postgres.Open(connectionStr), config)
+	variables.DB, err = gorm.Open(postgres.Open(connectionStr), config)
 	if err != nil {
 		return fmt.Errorf("error connecting to database: %w", err)
 	}
 
-	sqlDB, err := DB.DB()
+	sqlDB, err := variables.DB.DB()
 	if err != nil {
 		return fmt.Errorf("error getting underlying sql.DB: %w", err)
 	}
@@ -84,7 +85,7 @@ func initDB() error {
 		return fmt.Errorf("error pinging database: %w", err)
 	}
 
-	if err := DB.Use(otelgorm.NewPlugin(
+	if err := variables.DB.Use(otelgorm.NewPlugin(
 		otelgorm.WithDBName("stock-tracker-db"),
 		otelgorm.WithAttributes(
 			attribute.String("db.system", "postgresql"),
@@ -96,32 +97,32 @@ func initDB() error {
 		return fmt.Errorf("error enabling OpenTelemetry for GORM: %w", err)
 	}
 
-	DB.Callback().Query().Before("gorm:query").Register("query_start_time", func(db *gorm.DB) {
+	variables.DB.Callback().Query().Before("gorm:query").Register("query_start_time", func(db *gorm.DB) {
 
 		if db.Statement.Context == nil {
 			db.Statement.Context = context.Background()
 		}
 		db.Statement.Context = context.WithValue(db.Statement.Context, "gorm_start_time", time.Now())
 	})
-	DB.Callback().Create().Before("gorm:create").Register("create_start_time", func(db *gorm.DB) {
+	variables.DB.Callback().Create().Before("gorm:create").Register("create_start_time", func(db *gorm.DB) {
 		if db.Statement.Context == nil {
 			db.Statement.Context = context.Background()
 		}
 		db.Statement.Context = context.WithValue(db.Statement.Context, "gorm_start_time", time.Now())
 	})
-	DB.Callback().Update().Before("gorm:update").Register("update_start_time", func(db *gorm.DB) {
+	variables.DB.Callback().Update().Before("gorm:update").Register("update_start_time", func(db *gorm.DB) {
 		if db.Statement.Context == nil {
 			db.Statement.Context = context.Background()
 		}
 		db.Statement.Context = context.WithValue(db.Statement.Context, "gorm_start_time", time.Now())
 	})
-	DB.Callback().Delete().Before("gorm:delete").Register("delete_start_time", func(db *gorm.DB) {
+	variables.DB.Callback().Delete().Before("gorm:delete").Register("delete_start_time", func(db *gorm.DB) {
 		if db.Statement.Context == nil {
 			db.Statement.Context = context.Background()
 		}
 		db.Statement.Context = context.WithValue(db.Statement.Context, "gorm_start_time", time.Now())
 	})
-	DB.Callback().Raw().Before("gorm:raw").Register("raw_start_time", func(db *gorm.DB) {
+	variables.DB.Callback().Raw().Before("gorm:raw").Register("raw_start_time", func(db *gorm.DB) {
 		if db.Statement.Context == nil {
 			db.Statement.Context = context.Background()
 		}
@@ -152,13 +153,13 @@ func initDB() error {
 
 		if startTime, ok := ctx.Value("gorm_start_time").(time.Time); ok {
 			duration := time.Since(startTime).Seconds()
-			if dbQueryDuration != nil {
-				dbQueryDuration.Record(ctx, duration, metric.WithAttributes(attrs...))
+			if variables.DbQueryDuration != nil {
+				variables.DbQueryDuration.Record(ctx, duration, metric.WithAttributes(attrs...))
 			}
 		}
 
-		if dbQueryCount != nil {
-			dbQueryCount.Add(ctx, 1, metric.WithAttributes(attrs...))
+		if variables.DbQueryCount != nil {
+			variables.DbQueryCount.Add(ctx, 1, metric.WithAttributes(attrs...))
 		}
 
 		if isError {
@@ -173,13 +174,13 @@ func initDB() error {
 		}
 	}
 
-	DB.Callback().Query().After("gorm:after_query").Register("query_metrics", recordGormMetricsAndSpanStatus)
-	DB.Callback().Create().After("gorm:after_create").Register("create_metrics", recordGormMetricsAndSpanStatus)
-	DB.Callback().Update().After("gorm:after_update").Register("update_metrics", recordGormMetricsAndSpanStatus)
-	DB.Callback().Delete().After("gorm:after_delete").Register("delete_metrics", recordGormMetricsAndSpanStatus)
-	DB.Callback().Raw().After("gorm:after_raw").Register("raw_metrics", recordGormMetricsAndSpanStatus)
+	variables.DB.Callback().Query().After("gorm:after_query").Register("query_metrics", recordGormMetricsAndSpanStatus)
+	variables.DB.Callback().Create().After("gorm:after_create").Register("create_metrics", recordGormMetricsAndSpanStatus)
+	variables.DB.Callback().Update().After("gorm:after_update").Register("update_metrics", recordGormMetricsAndSpanStatus)
+	variables.DB.Callback().Delete().After("gorm:after_delete").Register("delete_metrics", recordGormMetricsAndSpanStatus)
+	variables.DB.Callback().Raw().After("gorm:after_raw").Register("raw_metrics", recordGormMetricsAndSpanStatus)
 
-	if err := DB.AutoMigrate(&UserSymbols{}, &User{}); err != nil {
+	if err := variables.DB.AutoMigrate(&UserSymbols{}, &User{}); err != nil {
 		return fmt.Errorf("error migrating database: %w", err)
 	}
 
@@ -207,8 +208,8 @@ func getEnv(key, defaultValue string) string {
 }
 
 func CloseDB() error {
-	if DB != nil {
-		sqlDB, err := DB.DB()
+	if variables.DB != nil {
+		sqlDB, err := variables.DB.DB()
 		if err != nil {
 			return fmt.Errorf("error getting underlying sql.DB: %w", err)
 		}

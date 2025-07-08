@@ -1,6 +1,6 @@
 # OpenTelemetry Web Application
 
-A comprehensive web application demonstrating modern observability practices with a Vue.js frontend, Go backend, PostgreSQL database, and complete observability pipeline using OpenTelemetry, Prometheus, Grafana, Jaeger, Fluentd, Elasticsearch, and Kibana. All components are containerized with Docker and orchestrated using Kubernetes, with simplified deployment through two separate HELM charts.
+A simple web application demonstrating modern observability practices with a Vue.js frontend, Go backend, PostgreSQL database, and complete observability pipeline using OpenTelemetry, Prometheus, Grafana, Jaeger, Fluentd, Elasticsearch, and Kibana. All components are containerized with Docker and orchestrated using Kubernetes, with simplified deployment through two separate HELM charts.
 
 ## Table of Contents
 

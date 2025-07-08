@@ -1,6 +1,7 @@
-package main
+package middleware
 
 import (
+	"backend/variables"
 	"encoding/json"
 	"net/http"
 
@@ -10,7 +11,7 @@ import (
 
 var propagator = propagation.TraceContext{}
 
-func logFrontendEvent(w http.ResponseWriter, r *http.Request) {
+func LogFrontendEvent(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
 		Type      string
 		Event     string                 `json:"event"`
@@ -19,7 +20,7 @@ func logFrontendEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		Logger.ErrorContext(r.Context(), "Invalid frontend log payload", "error", err)
+		variables.Logger.ErrorContext(r.Context(), "Invalid frontend log payload", "error", err)
 		http.Error(w, "Invalid payload", http.StatusBadRequest)
 		return
 	}
@@ -28,14 +29,14 @@ func logFrontendEvent(w http.ResponseWriter, r *http.Request) {
 	spanCtx := trace.SpanContextFromContext(ctx)
 
 	if payload.Type == "Error" {
-		Logger.ErrorContext(ctx, "Frontend log error",
+		variables.Logger.ErrorContext(ctx, "Frontend log error",
 			"event", payload.Event,
 			"metadata", payload.Metadata,
 			"traceId", spanCtx.TraceID().String(),
 			"spanId", spanCtx.SpanID().String(),
 		)
 	} else {
-		Logger.InfoContext(ctx, "Frontend log info",
+		variables.Logger.InfoContext(ctx, "Frontend log info",
 			"event", payload.Event,
 			"metadata", payload.Metadata,
 			"traceId", spanCtx.TraceID().String(),

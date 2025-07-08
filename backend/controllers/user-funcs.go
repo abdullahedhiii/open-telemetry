@@ -1,6 +1,7 @@
-package main
+package controllers
 
 import (
+	"backend/variables"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -29,10 +30,10 @@ type RegisterRequest struct {
 }
 
 type AuthResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-	Token   string `json:"token,omitempty"`
-	User    *User  `json:"user,omitempty"`
+	Success bool            `json:"success"`
+	Message string          `json:"message"`
+	Token   string          `json:"token,omitempty"`
+	User    *variables.User `json:"user,omitempty"`
 }
 
 type ErrorResponse struct {
@@ -41,7 +42,7 @@ type ErrorResponse struct {
 	Error   string `json:"error,omitempty"`
 }
 
-func generateJWT(user *User) (string, error) { return "dummy-jwt", nil }
+func generateJWT(user *variables.User) (string, error) { return "dummy-jwt", nil }
 func hashPassword(password string) ([]byte, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	return hashedPassword, err
@@ -57,9 +58,9 @@ func verifyPassword(hashedPassword []byte, password string) bool {
 	}
 }
 
-func loginUser(w http.ResponseWriter, r *http.Request) {
+func LoginUser(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Login request received")
-	if DB == nil {
+	if variables.DB == nil {
 		fmt.Println("DB is not initialized")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -100,15 +101,15 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 
-	if httpRequestCount != nil {
-		httpRequestCount.Add(ctx, 1, metric.WithAttributes(baseAttrs...))
+	if variables.HttpRequestCount != nil {
+		variables.HttpRequestCount.Add(ctx, 1, metric.WithAttributes(baseAttrs...))
 	}
 
-	if loginAttempts != nil {
-		loginAttempts.Add(ctx, 1, metric.WithAttributes(baseAttrs...))
+	if variables.LoginAttempts != nil {
+		variables.LoginAttempts.Add(ctx, 1, metric.WithAttributes(baseAttrs...))
 	}
 
-	Logger.InfoContext(ctx, "Login attempt started",
+	variables.Logger.InfoContext(ctx, "Login attempt started",
 		slog.String("remote_addr", r.RemoteAddr),
 		slog.String("user_agent", r.UserAgent()),
 	)
@@ -127,7 +128,7 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Invalid JSON")
 
-		Logger.ErrorContext(ctx, "Failed to parse login request",
+		variables.Logger.ErrorContext(ctx, "Failed to parse login request",
 			slog.String("error", err.Error()),
 		)
 
@@ -154,7 +155,7 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 		validateSpan.End()
 		span.SetStatus(codes.Error, "Missing required fields")
 
-		Logger.ErrorContext(ctx, "Login validation failed - missing fields",
+		variables.Logger.ErrorContext(ctx, "Login validation failed - missing fields",
 			slog.String("email", loginReq.Email),
 			slog.Bool("email_empty", loginReq.Email == ""),
 			slog.Bool("password_empty", loginReq.Password == ""),
@@ -170,7 +171,7 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 	validateSpan.SetStatus(codes.Ok, "Request validated successfully")
 	validateSpan.End()
 
-	var user User
+	var user variables.User
 	dbStartTime := time.Now()
 	dbCtx, dbSpan := tracer.Start(ctx, "auth.login.db_lookup",
 		trace.WithAttributes(
@@ -180,18 +181,18 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 		),
 	)
 
-	err := DB.WithContext(dbCtx).Where("email = ?", loginReq.Email).First(&user).Error
+	err := variables.DB.WithContext(dbCtx).Where("email = ?", loginReq.Email).First(&user).Error
 	dbDuration := time.Since(dbStartTime)
 
-	if dbQueryCount != nil {
-		dbQueryCount.Add(ctx, 1, metric.WithAttributes(append(baseAttrs,
+	if variables.DbQueryCount != nil {
+		variables.DbQueryCount.Add(ctx, 1, metric.WithAttributes(append(baseAttrs,
 			attribute.String("query_type", "select"),
 			attribute.String("table", "users"),
 		)...))
 	}
 
-	if dbQueryDuration != nil {
-		dbQueryDuration.Record(ctx, dbDuration.Seconds(), metric.WithAttributes(append(baseAttrs,
+	if variables.DbQueryDuration != nil {
+		variables.DbQueryDuration.Record(ctx, dbDuration.Seconds(), metric.WithAttributes(append(baseAttrs,
 			attribute.String("query_type", "select"),
 			attribute.String("table", "users"),
 		)...))
@@ -204,7 +205,7 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 		span.RecordError(err)
 
 		if err == gorm.ErrRecordNotFound {
-			Logger.InfoContext(ctx, "Login failed - user not found",
+			variables.Logger.InfoContext(ctx, "Login failed - user not found",
 				slog.String("email", loginReq.Email),
 				slog.Duration("db_duration", dbDuration),
 			)
@@ -215,7 +216,7 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 				Message: "Invalid credentials",
 			})
 		} else {
-			Logger.ErrorContext(ctx, "Database error during login",
+			variables.Logger.ErrorContext(ctx, "Database error during login",
 				slog.String("email", loginReq.Email),
 				slog.String("error", err.Error()),
 				slog.Duration("db_duration", dbDuration),
@@ -250,7 +251,7 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 		verifySpan.End()
 		span.SetStatus(codes.Error, "Invalid password")
 
-		Logger.InfoContext(ctx, "Login failed - invalid password",
+		variables.Logger.InfoContext(ctx, "Login failed - invalid password",
 			slog.String("email", loginReq.Email),
 			slog.Int("user_id", int(user.ID)),
 		)
@@ -279,7 +280,7 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 		tokenSpan.End()
 		span.RecordError(err)
 
-		Logger.ErrorContext(ctx, "JWT generation failed",
+		variables.Logger.ErrorContext(ctx, "JWT generation failed",
 			slog.String("email", loginReq.Email),
 			slog.Int("user_id", int(user.ID)),
 			slog.String("error", err.Error()),
@@ -296,8 +297,8 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 	tokenSpan.SetStatus(codes.Ok, "Token generated successfully")
 	tokenSpan.End()
 
-	if authDuration != nil {
-		authDuration.Record(ctx, time.Since(startTime).Seconds(),
+	if variables.AuthDuration != nil {
+		variables.AuthDuration.Record(ctx, time.Since(startTime).Seconds(),
 			metric.WithAttributes(append(baseAttrs,
 				attribute.String("status", "success"),
 				attribute.Int("user_id", int(user.ID)),
@@ -312,7 +313,7 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 		attribute.String("status", "success"),
 	)
 
-	Logger.InfoContext(ctx, "Login successful",
+	variables.Logger.InfoContext(ctx, "Login successful",
 		slog.String("email", loginReq.Email),
 		slog.Int("user_id", int(user.ID)),
 		slog.String("username", user.Username),
@@ -327,8 +328,8 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func registerUser(w http.ResponseWriter, r *http.Request) {
-	if DB == nil {
+func RegisterUser(w http.ResponseWriter, r *http.Request) {
+	if variables.DB == nil {
 		fmt.Println("DB is not initialized")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -369,15 +370,15 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 
-	if httpRequestCount != nil {
-		httpRequestCount.Add(ctx, 1, metric.WithAttributes(baseAttrs...))
+	if variables.HttpRequestCount != nil {
+		variables.HttpRequestCount.Add(ctx, 1, metric.WithAttributes(baseAttrs...))
 	}
 
-	if registerAttempts != nil {
-		registerAttempts.Add(ctx, 1, metric.WithAttributes(baseAttrs...))
+	if variables.RegisterAttempts != nil {
+		variables.RegisterAttempts.Add(ctx, 1, metric.WithAttributes(baseAttrs...))
 	}
 
-	Logger.InfoContext(ctx, "Registration attempt started",
+	variables.Logger.InfoContext(ctx, "Registration attempt started",
 		slog.String("remote_addr", r.RemoteAddr),
 		slog.String("user_agent", r.UserAgent()),
 	)
@@ -395,7 +396,7 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 		parseSpan.End()
 		span.RecordError(err)
 
-		Logger.ErrorContext(ctx, "Failed to parse registration request",
+		variables.Logger.ErrorContext(ctx, "Failed to parse registration request",
 			slog.String("error", err.Error()),
 		)
 
@@ -423,7 +424,7 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 		validateSpan.End()
 		span.SetStatus(codes.Error, "Missing required fields")
 
-		Logger.ErrorContext(ctx, "Registration validation failed - missing fields",
+		variables.Logger.ErrorContext(ctx, "Registration validation failed - missing fields",
 			slog.String("email", req.Email),
 			slog.String("username", req.Username),
 			slog.Bool("email_empty", req.Email == ""),
@@ -441,7 +442,7 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 	validateSpan.SetStatus(codes.Ok, "Request validated successfully")
 	validateSpan.End()
 
-	var existing User
+	var existing variables.User
 	dbStartTime := time.Now()
 	dbCtx, emailCheckSpan := tracer.Start(ctx, "auth.register.check_email",
 		trace.WithAttributes(
@@ -451,19 +452,19 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 		),
 	)
 
-	err := DB.WithContext(dbCtx).Where("email = ?", req.Email).First(&existing).Error
+	err := variables.DB.WithContext(dbCtx).Where("email = ?", req.Email).First(&existing).Error
 	emailCheckDuration := time.Since(dbStartTime)
 
-	if dbQueryCount != nil {
-		dbQueryCount.Add(ctx, 1, metric.WithAttributes(append(baseAttrs,
+	if variables.DbQueryCount != nil {
+		variables.DbQueryCount.Add(ctx, 1, metric.WithAttributes(append(baseAttrs,
 			attribute.String("query_type", "select"),
 			attribute.String("table", "users"),
 			attribute.String("check_type", "email"),
 		)...))
 	}
 
-	if dbQueryDuration != nil {
-		dbQueryDuration.Record(ctx, emailCheckDuration.Seconds(), metric.WithAttributes(append(baseAttrs,
+	if variables.DbQueryDuration != nil {
+		variables.DbQueryDuration.Record(ctx, emailCheckDuration.Seconds(), metric.WithAttributes(append(baseAttrs,
 			attribute.String("query_type", "select"),
 			attribute.String("table", "users"),
 			attribute.String("check_type", "email"),
@@ -474,7 +475,7 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 		emailCheckSpan.SetStatus(codes.Error, "Email already exists")
 		emailCheckSpan.End()
 
-		Logger.InfoContext(ctx, "Registration failed - email already exists",
+		variables.Logger.InfoContext(ctx, "Registration failed - email already exists",
 			slog.String("email", req.Email),
 			slog.Duration("db_duration", emailCheckDuration),
 		)
@@ -491,7 +492,7 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 		emailCheckSpan.End()
 		span.RecordError(err)
 
-		Logger.ErrorContext(ctx, "Database error during email check",
+		variables.Logger.ErrorContext(ctx, "Database error during email check",
 			slog.String("email", req.Email),
 			slog.String("error", err.Error()),
 			slog.Duration("db_duration", emailCheckDuration),
@@ -517,19 +518,19 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 		),
 	)
 
-	err = DB.WithContext(dbCtx).Where("username = ?", req.Username).First(&existing).Error
+	err = variables.DB.WithContext(dbCtx).Where("username = ?", req.Username).First(&existing).Error
 	usernameCheckDuration := time.Since(dbStartTime)
 
-	if dbQueryCount != nil {
-		dbQueryCount.Add(ctx, 1, metric.WithAttributes(append(baseAttrs,
+	if variables.DbQueryCount != nil {
+		variables.DbQueryCount.Add(ctx, 1, metric.WithAttributes(append(baseAttrs,
 			attribute.String("query_type", "select"),
 			attribute.String("table", "users"),
 			attribute.String("check_type", "username"),
 		)...))
 	}
 
-	if dbQueryDuration != nil {
-		dbQueryDuration.Record(ctx, usernameCheckDuration.Seconds(), metric.WithAttributes(append(baseAttrs,
+	if variables.DbQueryDuration != nil {
+		variables.DbQueryDuration.Record(ctx, usernameCheckDuration.Seconds(), metric.WithAttributes(append(baseAttrs,
 			attribute.String("query_type", "select"),
 			attribute.String("table", "users"),
 			attribute.String("check_type", "username"),
@@ -540,7 +541,7 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 		usernameCheckSpan.SetStatus(codes.Error, "Username already exists")
 		usernameCheckSpan.End()
 
-		Logger.InfoContext(ctx, "Registration failed - username already taken",
+		variables.Logger.InfoContext(ctx, "Registration failed - username already taken",
 			slog.String("username", req.Username),
 			slog.Duration("db_duration", usernameCheckDuration),
 		)
@@ -557,7 +558,7 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 		usernameCheckSpan.End()
 		span.RecordError(err)
 
-		Logger.ErrorContext(ctx, "Database error during username check",
+		variables.Logger.ErrorContext(ctx, "Database error during username check",
 			slog.String("username", req.Username),
 			slog.String("error", err.Error()),
 			slog.Duration("db_duration", usernameCheckDuration),
@@ -587,7 +588,7 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 		hashSpan.End()
 		span.RecordError(err)
 
-		Logger.ErrorContext(ctx, "Password hashing failed",
+		variables.Logger.ErrorContext(ctx, "Password hashing failed",
 			slog.String("email", req.Email),
 			slog.String("username", req.Username),
 			slog.String("error", err.Error()),
@@ -604,7 +605,7 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 	hashSpan.SetStatus(codes.Ok, "Password hashed successfully")
 	hashSpan.End()
 
-	user := &User{
+	user := &variables.User{
 		Username: req.Username,
 		Email:    req.Email,
 		Password: hashedPwd,
@@ -620,18 +621,18 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 		),
 	)
 
-	err = DB.WithContext(dbCtx).Create(user).Error
+	err = variables.DB.WithContext(dbCtx).Create(user).Error
 	createDuration := time.Since(dbStartTime)
 
-	if dbQueryCount != nil {
-		dbQueryCount.Add(ctx, 1, metric.WithAttributes(append(baseAttrs,
+	if variables.DbQueryCount != nil {
+		variables.DbQueryCount.Add(ctx, 1, metric.WithAttributes(append(baseAttrs,
 			attribute.String("query_type", "insert"),
 			attribute.String("table", "users"),
 		)...))
 	}
 
-	if dbQueryDuration != nil {
-		dbQueryDuration.Record(ctx, createDuration.Seconds(), metric.WithAttributes(append(baseAttrs,
+	if variables.DbQueryDuration != nil {
+		variables.DbQueryDuration.Record(ctx, createDuration.Seconds(), metric.WithAttributes(append(baseAttrs,
 			attribute.String("query_type", "insert"),
 			attribute.String("table", "users"),
 		)...))
@@ -643,7 +644,7 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 		createSpan.End()
 		span.RecordError(err)
 
-		Logger.ErrorContext(ctx, "User creation failed",
+		variables.Logger.ErrorContext(ctx, "User creation failed",
 			slog.String("email", req.Email),
 			slog.String("username", req.Username),
 			slog.String("error", err.Error()),
@@ -665,8 +666,8 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 	)
 	createSpan.End()
 
-	if authDuration != nil {
-		authDuration.Record(ctx, time.Since(startTime).Seconds(),
+	if variables.AuthDuration != nil {
+		variables.AuthDuration.Record(ctx, time.Since(startTime).Seconds(),
 			metric.WithAttributes(append(baseAttrs,
 				attribute.String("status", "success"),
 				attribute.Int("user_id", int(user.ID)),
@@ -682,7 +683,7 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 		attribute.String("status", "success"),
 	)
 
-	Logger.InfoContext(ctx, "Registration successful",
+	variables.Logger.InfoContext(ctx, "Registration successful",
 		slog.String("email", req.Email),
 		slog.String("username", req.Username),
 		slog.Int("user_id", int(user.ID)),

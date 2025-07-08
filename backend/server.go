@@ -1,6 +1,9 @@
 package main
 
 import (
+	"backend/controllers"
+	"backend/middleware"
+	opentel "backend/opentelemetry"
 	"context"
 	"fmt"
 	"log"
@@ -19,7 +22,7 @@ func main() {
 	router := mux.NewRouter()
 	fmt.Println("Starting..")
 
-	shutdown, err := initTelemetry()
+	shutdown, err := opentel.InitTelemetry()
 	if err != nil {
 		log.Fatal("Failed to initialize telemetry:", err)
 	}
@@ -43,16 +46,16 @@ func main() {
 	defer CloseDB()
 	fmt.Println("Database initialized")
 
-	router.HandleFunc("/users/login", loginUser).Methods("POST")
-	router.HandleFunc("/users/register", registerUser).Methods("POST")
-	router.HandleFunc("/stocks/symbols", getAllStockSymbols).Methods("GET")
-	router.HandleFunc("/stocks/{symbol}", getStockData).Methods("GET")
-	router.HandleFunc("/crypto/symbols", getAllCryptoSymbols).Methods("GET")
-	router.HandleFunc("/crypto/{symbol}", getCryptoData).Methods("GET")
-	router.HandleFunc("/watchlist/add", addToWatchlist).Methods("POST")
-	router.HandleFunc("/watchlist/{userId}", getWatchlist).Methods("GET")
-	router.HandleFunc("/watchlist/remove/{userId}/{type}/{symbol}", removeFromWatchlist).Methods("POST")
-	router.HandleFunc("/log-event", logFrontendEvent).Methods("POST")
+	router.HandleFunc("/users/login", controllers.LoginUser).Methods("POST")
+	router.HandleFunc("/users/register", controllers.RegisterUser).Methods("POST")
+	router.HandleFunc("/stocks/symbols", controllers.GetAllStockSymbols).Methods("GET")
+	router.HandleFunc("/stocks/{symbol}", controllers.GetStockData).Methods("GET")
+	router.HandleFunc("/crypto/symbols", controllers.GetAllCryptoSymbols).Methods("GET")
+	router.HandleFunc("/crypto/{symbol}", controllers.GetCryptoData).Methods("GET")
+	router.HandleFunc("/watchlist/add", controllers.AddToWatchlist).Methods("POST")
+	router.HandleFunc("/watchlist/{userId}", controllers.GetWatchlist).Methods("GET")
+	router.HandleFunc("/watchlist/remove/{userId}/{type}/{symbol}", controllers.RemoveFromWatchlist).Methods("POST")
+	router.HandleFunc("/log-event", middleware.LogFrontendEvent).Methods("POST")
 
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"*"},

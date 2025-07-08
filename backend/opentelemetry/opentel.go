@@ -1,6 +1,8 @@
-package main
+package opentelemetry
 
 import (
+	"backend/middleware"
+	"backend/variables"
 	"context"
 	"fmt"
 	"log"
@@ -21,24 +23,24 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
-var (
-	httpRequestCount metric.Int64Counter
-	// watchlistAddAttempts    metric.Int64Counter
-	externalAPICallDuration metric.Float64Histogram
-	dbQueryCount            metric.Int64Counter
-	dbQueryDuration         metric.Float64Histogram
-	loginAttempts           metric.Int64Counter
-	registerAttempts        metric.Int64Counter
-	authDuration            metric.Float64Histogram
-)
+// var (
+// 	variables.HttpRequestCount metric.Int64Counter
+// 	// watchlistAddAttempts    metric.Int64Counter
+// 	variables.ExternalAPICallDuration metric.Float64Histogram
+// 	variables.DbQueryCount            metric.Int64Counter
+// 	variables.DbQueryDuration         metric.Float64Histogram
+// 	variables.LoginAttempts           metric.Int64Counter
+// 	variables.RegisterAttempts        metric.Int64Counter
+// 	variables.AuthDuration            metric.Float64Histogram
+// )
 
-var (
-	tracerProvider *trace.TracerProvider
-	meterProvider  *sdkmetric.MeterProvider
-	Logger         *slog.Logger
-)
+// var (
+// 	variables.TracerProvider *trace.TracerProvider
+// 	variables.MeterProvider  *sdkmetric.MeterProvider
+// 	Logger         *slog.Logger
+// )
 
-func initTelemetry() (func(), error) {
+func InitTelemetry() (func(), error) {
 	ctx := context.Background()
 
 	logDir := "/fluentd/log"
@@ -50,11 +52,11 @@ func initTelemetry() (func(), error) {
 		return nil, fmt.Errorf("failed to open log file: %w", err)
 	}
 	baseHandler := slog.NewJSONHandler(logFile, nil)
-	otelHandler := NewOtelHandler(baseHandler)
-	Logger = slog.New(otelHandler)
+	otelHandler := middleware.NewOtelHandler(baseHandler)
+	variables.Logger = slog.New(otelHandler)
 	// Logger = slog.New(slog.NewJSONHandler(logFile, nil))
 
-	Logger.InfoContext(context.TODO(), "Logger initialized", "service", "otel-backend")
+	variables.Logger.InfoContext(context.TODO(), "Logger initialized", "service", "otel-backend")
 
 	res, err := resource.Merge(
 		resource.Default(),
@@ -80,12 +82,12 @@ func initTelemetry() (func(), error) {
 
 	bsp := trace.NewBatchSpanProcessor(traceExporter)
 
-	tracerProvider = trace.NewTracerProvider(
+	variables.TracerProvider = trace.NewTracerProvider(
 		trace.WithResource(res),
 		trace.WithSampler(trace.AlwaysSample()),
 		trace.WithSpanProcessor(bsp),
 	)
-	otel.SetTracerProvider(tracerProvider)
+	otel.SetTracerProvider(variables.TracerProvider)
 
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 
@@ -98,15 +100,15 @@ func initTelemetry() (func(), error) {
 		otlpmetrichttp.WithInsecure(),
 		otlpmetrichttp.WithURLPath("/v1/metrics"),
 	)
-	meterProvider = sdkmetric.NewMeterProvider(
+	variables.MeterProvider = sdkmetric.NewMeterProvider(
 		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricExporter)),
 		sdkmetric.WithResource(res),
 	)
-	otel.SetMeterProvider(meterProvider)
+	otel.SetMeterProvider(variables.MeterProvider)
 
 	meter := otel.Meter("stock-tracker-service")
 
-	loginAttempts, err = meter.Int64Counter(
+	variables.LoginAttempts, err = meter.Int64Counter(
 		"app_login_attempts",
 		metric.WithDescription("Total number of login attempts made by users."),
 		metric.WithUnit("{attempt}"),
@@ -116,7 +118,7 @@ func initTelemetry() (func(), error) {
 		return nil, fmt.Errorf("failed to create app_login_attempts instrument: %w", err)
 	}
 
-	registerAttempts, err = meter.Int64Counter(
+	variables.RegisterAttempts, err = meter.Int64Counter(
 		"app_register_attempts",
 		metric.WithDescription("Total number of user registration attempts."),
 		metric.WithUnit("{attempt}"),
@@ -124,7 +126,7 @@ func initTelemetry() (func(), error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create app_register_attempts instrument: %w", err)
 	}
-	authDuration, err = meter.Float64Histogram(
+	variables.AuthDuration, err = meter.Float64Histogram(
 		"app_auth_duration",
 		metric.WithDescription("Duration of user authentication operations."),
 		metric.WithUnit("s"),
@@ -132,7 +134,7 @@ func initTelemetry() (func(), error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create app_auth_duration instrument: %w", err)
 	}
-	httpRequestCount, err = meter.Int64Counter(
+	variables.HttpRequestCount, err = meter.Int64Counter(
 		"app_http_request_count",
 		metric.WithDescription("Total number of successful HTTP requests handled by the application."),
 		metric.WithUnit("{request}"),
@@ -141,7 +143,7 @@ func initTelemetry() (func(), error) {
 		return nil, fmt.Errorf("failed to create app.http.request_count instrument: %w", err)
 	}
 
-	dbQueryCount, err = meter.Int64Counter(
+	variables.DbQueryCount, err = meter.Int64Counter(
 		"app_db_query_count",
 		metric.WithDescription("Total number of database queries executed by the application."),
 		metric.WithUnit("{request}"),
@@ -150,7 +152,7 @@ func initTelemetry() (func(), error) {
 		return nil, fmt.Errorf("failed to create app.db.query_count instrument: %w", err)
 	}
 
-	dbQueryDuration, err = meter.Float64Histogram(
+	variables.DbQueryDuration, err = meter.Float64Histogram(
 		"app_db_query_duration",
 		metric.WithDescription("Duration of database queries executed by the application."),
 		metric.WithUnit("s"),
@@ -159,7 +161,7 @@ func initTelemetry() (func(), error) {
 		return nil, fmt.Errorf("failed to create app.db.query_duration instrument: %w", err)
 	}
 
-	externalAPICallDuration, err = meter.Float64Histogram(
+	variables.ExternalAPICallDuration, err = meter.Float64Histogram(
 		"app_external_api_call_duration",
 		metric.WithDescription("Duration of external stock data API calls."),
 		metric.WithUnit("s"),
@@ -192,16 +194,16 @@ func initTelemetry() (func(), error) {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		if tracerProvider != nil {
+		if variables.TracerProvider != nil {
 			log.Println("Shutting down OpenTelemetry Trace Provider...")
-			if err := tracerProvider.Shutdown(shutdownCtx); err != nil {
+			if err := variables.TracerProvider.Shutdown(shutdownCtx); err != nil {
 				log.Printf("Error shutting down trace provider: %v", err)
 			}
 		}
 
-		if meterProvider != nil {
+		if variables.MeterProvider != nil {
 			log.Println("Shutting down OpenTelemetry Meter Provider...")
-			if err := meterProvider.Shutdown(shutdownCtx); err != nil {
+			if err := variables.MeterProvider.Shutdown(shutdownCtx); err != nil {
 				log.Printf("Error shutting down meter provider: %v", err)
 			}
 		}
