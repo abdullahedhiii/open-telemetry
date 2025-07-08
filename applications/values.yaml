@@ -157,7 +157,7 @@ kibana:
       cpu: "500m"
   elasticsearch:
     hosts: https://elasticsearch-service:9200
-    token: AAEAAWVsYXN0aWMva2liYW5hL2tpYmFuYS10b2tlbjpDTnpvaGNsSFNHR3NBQk9Ca3F6Z2xn
+    token: AAEAAWVsYXN0aWMva2liYW5hL2tpYmFuYS10b2tlbjpRaWdsZFA0blF0NnNfZk5DNklmcF9R
     cert: /usr/share/kibana/config/certs/http_ca.crt
     sslVerificationMode: none
   config:

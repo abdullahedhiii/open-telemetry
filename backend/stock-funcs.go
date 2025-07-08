@@ -811,7 +811,7 @@ func removeFromWatchlist(w http.ResponseWriter, r *http.Request) {
 	)
 	var result *gorm.DB
 	if d_type == "CRYPTO" {
-		result = DB.Where("user_id = ? AND cryptoId = ? ", userId, symbol, "CRYPTO").Delete(&UserSymbols{})
+		result = DB.Where("user_id = ? AND crypto_id = ? ", userId, symbol).Delete(&UserSymbols{})
 	} else {
 		result = DB.Where("user_id = ? AND symbol = ?", userId, symbol).Delete(&UserSymbols{})
 	}

@@ -172,7 +172,7 @@ async function fetchWatchlist() {
         });
       });
     } catch (err) {
-      console.error("Error fetching watchlist:", err);
+      // console.error("Error fetching watchlist:", err);
       mainSpan.setAttributes({
         'error.message': err.message,
         'operation.success': false
@@ -272,9 +272,9 @@ async function fetchSymbols() {
       processingSpan.end();
 
       // Trace ID debug
-      console.log('main:', mainSpan.spanContext().traceId);
-      console.log('http:', httpSpan.spanContext().traceId);
-      console.log('processing:', processingSpan.spanContext().traceId);
+      // console.log('main:', mainSpan.spanContext().traceId);
+      // console.log('http:', httpSpan.spanContext().traceId);
+      // console.log('processing:', processingSpan.spanContext().traceId);
     });
 
     symbols.value = processedSymbols;
@@ -388,7 +388,7 @@ async function addToWatchlist(symbol,id) {
     filterSymbols()
     span.setStatus({ code: 1 })
   } catch (err) {
-    console.error("Error adding to watchlist:", err)
+    // console.error("Error adding to watchlist:", err)
     span.setAttributes({
       'operation.success': false,
       'error.message': err.message
@@ -417,7 +417,7 @@ async function removeFromWatchlist(symbol,id) {
     const userId = parsedUser.ID 
 
     const apiUrl = import.meta.env.VITE_API_URL
-    const endpoint = `${apiUrl}/watchlist/remove/${userId}/crypto/${id}`
+    const endpoint = `${apiUrl}/watchlist/remove/${userId}/CRYPTO/${id}`
 
     const headers = {}
     const ctx = trace.setSpan(context.active(), span)
@@ -440,7 +440,7 @@ async function removeFromWatchlist(symbol,id) {
     filterSymbols()
     span.setStatus({ code: 1 })
   } catch (err) {
-    console.error("Error removing from watchlist:", err)
+    // console.error("Error removing from watchlist:", err)
     span.setAttributes({
       'error.message': err.message,
       'operation.success': false

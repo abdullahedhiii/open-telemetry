@@ -173,7 +173,7 @@ async function fetchWatchlist() {
         });
       });
     } catch (err) {
-      console.error("Error fetching watchlist:", err);
+      // console.error("Error fetching watchlist:", err);
       mainSpan.setAttributes({
         'error.message': err.message,
         'operation.success': false
@@ -262,7 +262,7 @@ async function fetchSymbols() {
       const processingSpan = tracer.startSpan("process_response_data");
 
       const data = await response.json();
-      processedSymbols = Array.isArray(data) ? data : data.symbols || [];
+      const processedSymbols = Array.isArray(data) ? data : data.symbols || [];
 
       processingSpan.setAttributes({
         'data.symbols_count': processedSymbols.length,
@@ -271,14 +271,7 @@ async function fetchSymbols() {
 
       processingSpan.setStatus({ code: 1 });
       processingSpan.end();
-
-      // Trace ID debug
-      console.log('main:', mainSpan.spanContext().traceId);
-      console.log('http:', httpSpan.spanContext().traceId);
-      console.log('processing:', processingSpan.spanContext().traceId);
-    });
-
-    symbols.value = processedSymbols
+  symbols.value = processedSymbols
     filteredSymbols.value = processedSymbols
     
     mainSpan.setAttributes({
@@ -286,6 +279,13 @@ async function fetchSymbols() {
       'operation.success': true
     })
     
+      // Trace ID debug
+      // console.log('main:', mainSpan.spanContext().traceId);
+      // console.log('http:', httpSpan.spanContext().traceId);
+      // console.log('processing:', processingSpan.spanContext().traceId);
+    });
+
+  
     httpSpan.setStatus({ code: 1 })
     mainSpan.setStatus({ code: 1 })
     
@@ -417,7 +417,7 @@ async function removeFromWatchlist(symbol) {
     const userId = parsedUser.ID 
 
     const apiUrl = import.meta.env.VITE_API_URL
-    const endpoint = `${apiUrl}/watchlist/remove/${userId}/stock/${symbol}`
+    const endpoint = `${apiUrl}/watchlist/remove/${userId}/STOCK/${symbol}`
 
     const headers = {}
     const ctx = trace.setSpan(context.active(), span)

@@ -16,10 +16,6 @@ const dataType = computed(() => {
 })
 
 const stockData = computed(() => {
-  // console.log('Stock Data Computed:', detailsData.value)
-  if (dataType.value === 'stocks' && detailsData.value && Array.isArray(detailsData.value)) {
-    return detailsData.value[0] || null
-  }
   return dataType.value === 'stocks' ? detailsData.value : null
 })
 
@@ -30,42 +26,63 @@ const cryptoData = computed(() => {
   return dataType.value === 'crypto' ? detailsData.value : null
 })
 
+// const cleanMeta = computed(() => {
+//   const meta = stockData.value?.metaData || {};
+//   return {
+//     symbol: meta["2. Symbol"],
+//     lastRefreshed: meta["3. Last Refreshed"],
+//     outputSize: meta["4. Output Size"],
+//     timeZone: meta["5. Time Zone"]
+//   };
+// });
+
+
+const limitedTimeSeriesData = computed(() => {
+  const raw = stockData.value?.timeSeries || {};
+  return Object.entries(raw)
+    .sort(([a], [b]) => b.localeCompare(a)) // descending by date
+    .slice(0, 30)
+    .map(([date, data]) => ({
+      date,
+      open: data["1. open"],
+      high: data["2. high"],
+      low: data["3. low"],
+      close: data["4. close"],
+      volume: data["5. volume"],
+    }));
+});
+
 
 const currentPrice = computed(() => {
-  console.log(stockData.value,'cur')
-  if (!stockData.value?.timeSeries) return '0.00'
-  const dates = Object.keys(stockData.value.timeSeries).sort().reverse()
+  const ts = stockData.value?.timeSeries
+  if (!ts) return 0
+  const dates = Object.keys(ts).sort().reverse()
   const latestDate = dates[0]
-  return stockData.value.timeSeries[latestDate]?.close || '0.00'
+  return parseFloat(ts[latestDate]['4. close']) || 0
 })
 
 const dayHigh = computed(() => {
-  if (!stockData.value?.timeSeries) return '0.00'
-  const dates = Object.keys(stockData.value.timeSeries).sort().reverse()
+  const ts = stockData.value?.timeSeries
+  if (!ts) return 0
+  const dates = Object.keys(ts).sort().reverse()
   const latestDate = dates[0]
-  return stockData.value.timeSeries[latestDate]?.high || '0.00'
+  return parseFloat(ts[latestDate]['2. high']) || 0
 })
 
 const dayLow = computed(() => {
-  if (!stockData.value?.timeSeries) return '0.00'
-  const dates = Object.keys(stockData.value.timeSeries).sort().reverse()
+  const ts = stockData.value?.timeSeries
+  if (!ts) return 0
+  const dates = Object.keys(ts).sort().reverse()
   const latestDate = dates[0]
-  return stockData.value.timeSeries[latestDate]?.low || '0.00'
+  return parseFloat(ts[latestDate]['3. low']) || 0
 })
 
 const currentVolume = computed(() => {
-  if (!stockData.value?.timeSeries) return '0'
-  const dates = Object.keys(stockData.value.timeSeries).sort().reverse()
+  const ts = stockData.value?.timeSeries
+  if (!ts) return 0
+  const dates = Object.keys(ts).sort().reverse()
   const latestDate = dates[0]
-  return stockData.value.timeSeries[latestDate]?.volume || '0'
-})
-
-const limitedTimeSeriesData = computed(() => {
-  if (!stockData.value?.timeSeries) return {}
-  const entries = Object.entries(stockData.value.timeSeries)
-  const sortedEntries = entries.sort(([a], [b]) => new Date(b) - new Date(a))
-  const limitedEntries = sortedEntries.slice(0, 10) 
-  return Object.fromEntries(limitedEntries)
+  return parseInt(ts[latestDate]['5. volume']) || 0
 })
 
 function formatNumber(num) {
@@ -92,6 +109,7 @@ function formatDate(dateString) {
 }
 
 async function fetchData() {
+  // console.log(symbol.value,type.value)
   const span = tracer.startSpan('load_symbol_details', {
     attributes: {
       'symbol': symbol.value,
@@ -101,6 +119,7 @@ async function fetchData() {
     }
   });
   const ctx = trace.setSpan(context.active(), span)
+      await context.with(ctx, async () => {
   try {
 
     loading.value = true;
@@ -109,10 +128,9 @@ async function fetchData() {
     const headers = {}
     propagation.inject(ctx, headers)
     headers['Content-Type'] = 'application/json'
-    
     const detailsSpan = tracer.startSpan('fetch_symbol_data', { parent: span });
-    console.log('Fetching details for:', symbol.value, 'Type:', type.value);
-    console.log('API URL:', `${import.meta.env.VITE_API_URL}/${type.value}/${symbol.value}`);
+    // console.log('Fetching details for:', symbol.value, 'Type:', type.value);
+    // console.log('API URL:', `${import.meta.env.VITE_API_URL}/${type.value}/${symbol.value}`);
     const response = await fetch(`${import.meta.env.VITE_API_URL}/${type.value}/${symbol.value}`,{
       headers: headers
     });
@@ -122,8 +140,9 @@ async function fetchData() {
     }
 
     const responseData = await response.json();
-    console.log(type.value, "response= ",responseData)
+    // console.log(type.value, "response= ",responseData)
     if (type.value === 'stocks') {
+      // console.log("cchecing for stocks ",responseData,responseData['Meta Data'])
      detailsData.value = {
        metaData: responseData['Meta Data'],
        timeSeries: responseData['Time Series (Daily)']
@@ -132,9 +151,10 @@ async function fetchData() {
     detailsData.value = responseData;
 }
 
-    
+    // console.log('Fetched details:', detailsData.value);
     detailsSpan.setStatus({ code: 1 });
     detailsSpan.end();
+
      logFrontendEvent({
     event: 'Fetched symbol details',
      type: 'data',
@@ -147,7 +167,7 @@ async function fetchData() {
    });
     
     checkWatchlistStatus();
-    
+
   } catch (err) {
 
    logFrontendEvent({
@@ -165,7 +185,7 @@ async function fetchData() {
   } finally {
     loading.value = false;
     span.end();
-  }
+  }    })
 }
 
 function checkWatchlistStatus() {
@@ -174,74 +194,74 @@ function checkWatchlistStatus() {
     let watchlist = savedWatchlist ? JSON.parse(savedWatchlist) : []
     isInWatchlist.value = watchlist.some(item => item.symbol === symbol.value && item.type === type.value)
   } catch (err) {
-    console.error('Error checking watchlist status:', err)
+    // console.error('Error checking watchlist status:', err)
     isInWatchlist.value = false
   }
 }
 
-function toggleWatchlist() {
-  const span = tracer.startSpan('toggle_watchlist_from_details', {
-    attributes: {
-      'symbol': symbol.value,
-      'symbol.type': type.value,
-      'current.in_watchlist': isInWatchlist.value,
-      'user.action': isInWatchlist.value ? 'remove_from_watchlist' : 'add_to_watchlist'
-    }
-  })
+// function toggleWatchlist() {
+//   const span = tracer.startSpan('toggle_watchlist_from_details', {
+//     attributes: {
+//       'symbol': symbol.value,
+//       'symbol.type': type.value,
+//       'current.in_watchlist': isInWatchlist.value,
+//       'user.action': isInWatchlist.value ? 'remove_from_watchlist' : 'add_to_watchlist'
+//     }
+//   })
   
-  try {
-    const savedWatchlist = localStorage.getItem('userWatchlist')
-    let watchlist = savedWatchlist ? JSON.parse(savedWatchlist) : []
+//   try {
+//     const savedWatchlist = localStorage.getItem('userWatchlist')
+//     let watchlist = savedWatchlist ? JSON.parse(savedWatchlist) : []
     
-    if (isInWatchlist.value) {
+//     if (isInWatchlist.value) {
       
-      watchlist = watchlist.filter(item => !(item.symbol === symbol.value && item.type === type.value))
-      isInWatchlist.value = false
-    } else {
+//       watchlist = watchlist.filter(item => !(item.symbol === symbol.value && item.type === type.value))
+//       isInWatchlist.value = false
+//     } else {
       
-      const itemName = type.value === 'crypto' 
-        ? (cryptoData.value?.name || symbol.value)
-        : (stockData.value?.metaData?.symbol || stockData.value?.name || symbol.value);
+//       const itemName = type.value === 'crypto' 
+//         ? (cryptoData.value?.name || symbol.value)
+//         : (stockData.value?.metaData?.symbol || stockData.value?.name || symbol.value);
         
-      watchlist.push({
-        symbol: symbol.value,
-        name: itemName,
-        type: type.value,
-        dateAdded: new Date().toISOString()
-      })
-      isInWatchlist.value = true
-    }
+//       watchlist.push({
+//         symbol: symbol.value,
+//         name: itemName,
+//         type: type.value,
+//         dateAdded: new Date().toISOString()
+//       })
+//       isInWatchlist.value = true
+//     }
     
-    localStorage.setItem('userWatchlist', JSON.stringify(watchlist))
+//     localStorage.setItem('userWatchlist', JSON.stringify(watchlist))
     
-    span.setAttributes({
-      'watchlist.new_status': isInWatchlist.value,
-      'watchlist.total_items': watchlist.length,
-      'operation.success': true
-    })
-    logFrontendEvent({
-    event: isInWatchlist.value ? 'Added to watchlist' : 'Removed from watchlist',
-    type: 'user_action',
-    metadata: {
-      symbol: symbol.value,
-      type: type.value,
-      newStatus: isInWatchlist.value
-    },
-    span
-  });
-    span.setStatus({ code: 1 })
-  } catch (err) {
-       logFrontendEvent({
-     event: 'Error updating watchlist',
-     type: 'error',
-     metadata: { message: err.message, symbol: symbol.value },
-     span
-   });
-    span.setStatus({ code: 2, message: err.message })
-  } finally {
-    span.end()
-  }
-}
+//     span.setAttributes({
+//       'watchlist.new_status': isInWatchlist.value,
+//       'watchlist.total_items': watchlist.length,
+//       'operation.success': true
+//     })
+//     logFrontendEvent({
+//     event: isInWatchlist.value ? 'Added to watchlist' : 'Removed from watchlist',
+//     type: 'user_action',
+//     metadata: {
+//       symbol: symbol.value,
+//       type: type.value,
+//       newStatus: isInWatchlist.value
+//     },
+//     span
+//   });
+//     span.setStatus({ code: 1 })
+//   } catch (err) {
+//        logFrontendEvent({
+//      event: 'Error updating watchlist',
+//      type: 'error',
+//      metadata: { message: err.message, symbol: symbol.value },
+//      span
+//    });
+//     span.setStatus({ code: 2, message: err.message })
+//   } finally {
+//     span.end()
+//   }
+// }
 
 onMounted(() => {
   const span = tracer.startSpan('details_page_mounted', {
@@ -289,11 +309,11 @@ onMounted(() => {
           <div class="header-content">
             <h1>{{ stockData.metaData?.symbol || symbol }}</h1>
             <p class="subtitle">{{ stockData.metaData?.information || 'Stock Information' }}</p>
-            <button @click="toggleWatchlist" class="watchlist-btn" :class="{ active: isInWatchlist }">
+            <!-- <button @click="toggleWatchlist" class="watchlist-btn" :class="{ active: isInWatchlist }">
               {{ isInWatchlist ? 'Remove from Watchlist' : 'Add to Watchlist' }}
-            </button>
+            </button> -->
           </div>
-          <div class="meta-grid">
+          <!-- <div class="meta-grid">
             <div class="meta-item">
               <span class="label">Last Refreshed</span>
               <span class="value">{{ stockData.metaData?.lastRefreshed || 'N/A' }}</span>
@@ -310,7 +330,7 @@ onMounted(() => {
               <span class="label">Current Price</span>
               <span class="value price">${{ parseFloat(currentPrice).toFixed(2) }}</span>
             </div>
-          </div>
+          </div> -->
         </div>
 
         
@@ -352,14 +372,15 @@ onMounted(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(data, date) in limitedTimeSeriesData" :key="date">
-                  <td class="date-cell">{{ formatDate(date) }}</td>
-                  <td class="price-cell">${{ parseFloat(data.open).toFixed(2) }}</td>
-                  <td class="price-cell high-price">${{ parseFloat(data.high).toFixed(2) }}</td>
-                  <td class="price-cell low-price">${{ parseFloat(data.low).toFixed(2) }}</td>
-                  <td class="price-cell">${{ parseFloat(data.close).toFixed(2) }}</td>
-                  <td class="volume-cell">{{ formatNumber(data.volume) }}</td>
-                </tr>
+                <tr v-for="entry in limitedTimeSeriesData" :key="entry.date">
+  <td class="date-cell">{{ formatDate(entry.date) }}</td>
+  <td class="price-cell">${{ parseFloat(entry.open).toFixed(2) }}</td>
+  <td class="price-cell high-price">${{ parseFloat(entry.high).toFixed(2) }}</td>
+  <td class="price-cell low-price">${{ parseFloat(entry.low).toFixed(2) }}</td>
+  <td class="price-cell">${{ parseFloat(entry.close).toFixed(2) }}</td>
+  <td class="volume-cell">{{ formatNumber(entry.volume) }}</td>
+</tr>
+
               </tbody>
             </table>
           </div>

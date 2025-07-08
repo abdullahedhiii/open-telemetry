@@ -266,7 +266,7 @@ async function handleRegister() {
     
     const apiUrl = import.meta.env.VITE_API_URL || ""
     const endpoint = `${apiUrl}/users/register`
-    console.log(endpoint)
+    // console.log(endpoint)
     const headers = {}
     propagation.inject(context.active(), headers)
     headers['Content-Type'] = 'application/json'
